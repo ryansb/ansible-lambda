@@ -51,6 +51,11 @@ def main():
     module = AnsibleModule(
         argument_spec=argument_spec,
         supports_check_mode=True,
+        mutually_exclusive=[
+            ['function_name', 'max_items'],
+            ['show_versions', 'max_items'],
+        ],
+
     )
 
     if not HAS_BOTO3:
@@ -73,23 +78,22 @@ def main():
         try:
             lambda_facts.update(c.get_function_configuration(FunctionName=function_name))
             lambda_facts.update(c.list_aliases(FunctionName=function_name))
-            ret = c.get_policy(FunctionName=function_name)
-            ret['Policy'] = json.loads(ret['Policy'])
-            lambda_facts.update(ret)
+            # get_policy returns a JSON string so must convert to dict before reassigning to its key
+            lambda_facts.update(Policy=json.loads(c.get_policy(FunctionName=function_name)['Policy']))
             show_versions = module.params['show_versions']
             if show_versions:
                 lambda_facts.update(c.list_versions_by_function(FunctionName=function_name))
         except Exception as e:
             module.fail_json(msg=str(e))
     else:
+        params = dict()
+        if module.params.get('max_items'):
+            params['MaxItems'] = module.params.get('max_items')
+
+        if module.params.get('next_marker'):
+            params['Marker'] = module.params.get('next_marker')
+
         try:
-            params = dict()
-            if module.params.get('max_items'):
-                params['MaxItems'] = module.params.get('max_items')
-
-            if module.params.get('next_marker'):
-                params['Marker'] = module.params.get('next_marker')
-
             lambda_facts.update(c.list_functions(**params))
             lambda_facts.update(c.list_event_source_mappings(**params))
         except Exception as e:
