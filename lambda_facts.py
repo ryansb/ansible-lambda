@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 '''
-This has been forked from ansible-modulues-core
+AWS Lambda WIP
 '''
 
 import os
@@ -43,6 +43,8 @@ def main():
             aws_profile=dict(required=False, default=None),
             function_name=dict(required=False, default=None),
             show_versions=dict(required=False, default=False, type='bool'),
+            max_items=dict(type='int'),
+            next_marker=dict()
         )
     )
 
@@ -64,30 +66,37 @@ def main():
         if len(function_name) > 64:
             module.fail_json(msg='Lambda name "%s" exceeds 255 character limit' % function_name)
 
-
-    show_versions = module.params['show_versions']
-    results = dict(changed=False)
+    lambda_facts = dict()
 
     c = boto3.client('lambda')
     if function_name:
         try:
-            results.update(c.get_function_configuration(FunctionName=function_name))
-            results.update(c.list_aliases(FunctionName=function_name))
+            lambda_facts.update(c.get_function_configuration(FunctionName=function_name))
+            lambda_facts.update(c.list_aliases(FunctionName=function_name))
             ret = c.get_policy(FunctionName=function_name)
             ret['Policy'] = json.loads(ret['Policy'])
-            results.update(ret)
+            lambda_facts.update(ret)
+            show_versions = module.params['show_versions']
             if show_versions:
-                results.update(c.list_versions_by_function(FunctionName=function_name))
-           # results.update({"ansible_facts": {"action": "list"}})
+                lambda_facts.update(c.list_versions_by_function(FunctionName=function_name))
         except Exception as e:
             module.fail_json(msg=str(e))
     else:
         try:
-            results.update(c.list_functions())
-            results.update(c.list_event_source_mappings())
+            params = dict()
+            if module.params.get('max_items'):
+                params['MaxItems'] = module.params.get('max_items')
+
+            if module.params.get('next_marker'):
+                params['Marker'] = module.params.get('next_marker')
+
+            lambda_facts.update(c.list_functions(**params))
+            lambda_facts.update(c.list_event_source_mappings(**params))
         except Exception as e:
             module.fail_json(msg=str(e))
 
+    del lambda_facts['ResponseMetadata']
+    results = dict(ansible_facts=lambda_facts, changed=False)
     module.exit_json(**results)
 
 # ansible import module(s) kept at ~eof as recommended
