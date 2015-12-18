@@ -96,6 +96,28 @@ def policy_details(client, module):
     return lambda_facts
 
 
+def mapping_details(client, module):
+    lambda_facts = dict()
+
+    if module.params.get('function_name'):
+        module.fail_json(msg='Invalid parameter function_name for mappings query.')
+
+    params = dict()
+    if module.params.get('max_items'):
+        params['MaxItems'] = module.params.get('max_items')
+
+    if module.params.get('next_marker'):
+        params['Marker'] = module.params.get('next_marker')
+
+    try:
+        lambda_facts.update(client.list_event_source_mappings(**params))
+    except Exception as e:
+        module.fail_json(msg=str(e))
+
+
+    return lambda_facts
+
+
 def version_details(client, module):
     lambda_facts = dict()
 
@@ -142,7 +164,7 @@ def main():
     function_name = module.params['function_name']
     if function_name:
         if not re.search('^[a-zA-z][a-zA-Z0-9\-_]+$', function_name):
-            module.fail_json(msg='Lambda name %s is invalid. Names must contain only alphanumeric characters and hyphens and must start with an alphabetic character.' % function_name)
+            module.fail_json(msg='Function name %s is invalid. Names must contain only alphanumeric characters and hyphens.' % function_name)
 
         if len(function_name) > 64:
             module.fail_json(msg='Function name "%s" exceeds 64 character limit' % function_name)
@@ -154,13 +176,14 @@ def main():
         'config': config_details,
         'aliases': alias_details,
         'policy': policy_details,
-        'mappings': config_details,
+        'mappings': mapping_details,
         'versions': version_details,
         'all': all_details,
     }
     lambda_facts = invocations[module.params.get('query')](client, module)
 
-    del lambda_facts['ResponseMetadata']
+    if 'ResponseMetadata' in lambda_facts:
+        del lambda_facts['ResponseMetadata']
     results = dict(ansible_facts=lambda_facts, changed=False)
     module.exit_json(**results)
 
