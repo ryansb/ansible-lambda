@@ -1,16 +1,109 @@
 #!/usr/bin/python
+# This module is a candidate for Ansible module extras.
+#
+# Ansible is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Ansible is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
 
+DOCUMENTATION = '''
+module: lambda_facts
+short_description: Retrieves AWS Lambda function details using AWS methods (boto3)
+description:
+    - Gets various details related to Lambda functions, including aliases, versions and event source mappings
+version_added: "1.0"
+options:
+  query:
+    description:
+      - specifies the query action to take
+    required: False
+    choices: [
+            'aliases',
+            'all',
+            'config',
+            'mappings',
+            'policy',
+            'versions',
+            ],
+    default: 'all'
+  function_name:
+    description:
+      - The name of the lambda function.
+     required: false
+  max_items:
+    description:
+      - Maximum number of items to return for various list requests
+    required: false
+  next_marker:
+    description:
+      - "Some queries such as 'versions' or 'mappings' will return a maximum
+        number of entries - EG 100. If the number of entries exceeds this maximum
+        another request can be sent using the NextMarker entry from the first response
+        to get the next page of results"
+    required: false
+author: Pierre Jodouin(@pjodouin)
+extends_documentation_fragment: aws
 '''
-AWS Lambda WIP
+
+EXAMPLES = '''
+# Simple example of listing all info for a function
+- name: List all for a specific function
+  lambda_facts:
+    query: all
+    function_name: myFunction
+  register: my_function_details
+# List all versions of a function
+- name: List function versions
+  lambda_facts:
+    query: versions
+    function_name: myFunction
+  register: my_function_versions
+# List all lambda functions
+- name: List all functions
+  lambda_facts:
+    query: versions
+    max_items: 20
+- name: show Lambda facts
+  debug: var=Versions
 '''
 
 try:
     import boto3
-    from boto.exception import *
-    from botocore.exceptions import *
+    from boto.exception import BotoServerError
+    from botocore.exceptions import ClientError
     HAS_BOTO3 = True
 except ImportError:
     HAS_BOTO3 = False
+
+
+def alias_details(client, module):
+
+    lambda_facts = dict()
+
+    function_name = module.params.get('function_name')
+    if function_name:
+        params = dict()
+        if module.params.get('max_items'):
+            params['MaxItems'] = module.params.get('max_items')
+
+        if module.params.get('next_marker'):
+            params['Marker'] = module.params.get('next_marker')
+        try:
+            lambda_facts.update(client.list_aliases(FunctionName=function_name, **params))
+        except (BotoServerError, ClientError), e:
+            module.fail_json(msg='Unable to get {0} aliases, error: {1}'.format(function_name, e))
+    else:
+        module.fail_json(msg='Parameter function_name required for query=aliases.')
+
+    return lambda_facts
 
 
 def all_details(client, module):
@@ -59,24 +152,24 @@ def config_details(client, module):
     return lambda_facts
 
 
-def alias_details(client, module):
+def mapping_details(client, module):
 
     lambda_facts = dict()
+    params = dict()
 
-    function_name = module.params.get('function_name')
-    if function_name:
-        params = dict()
-        if module.params.get('max_items'):
-            params['MaxItems'] = module.params.get('max_items')
+    if module.params.get('function_name'):
+        params['FunctionName'] = module.params.get('function_name')
 
-        if module.params.get('next_marker'):
-            params['Marker'] = module.params.get('next_marker')
-        try:
-            lambda_facts.update(client.list_aliases(FunctionName=function_name, **params))
-        except (BotoServerError, ClientError), e:
-            module.fail_json(msg='Unable to get {0} aliases, error: {1}'.format(function_name, e))
-    else:
-        module.fail_json(msg='Parameter function_name required for query=aliases.')
+    if module.params.get('max_items'):
+        params['MaxItems'] = module.params.get('max_items')
+
+    if module.params.get('next_marker'):
+        params['Marker'] = module.params.get('next_marker')
+
+    try:
+        lambda_facts.update(client.list_event_source_mappings(**params))
+    except (BotoServerError, ClientError), e:
+        module.fail_json(msg='Unable to get source event mappings, error: {0}'.format(e))
 
     return lambda_facts
 
@@ -97,28 +190,6 @@ def policy_details(client, module):
             module.fail_json(msg='Unable to get {0} policy, error: {1}'.format(function_name, e))
     else:
         module.fail_json(msg='Parameter function_name required for query=policy.')
-
-    return lambda_facts
-
-
-def mapping_details(client, module):
-
-    lambda_facts = dict()
-    params = dict()
-
-    if module.params.get('function_name'):
-        params['FunctionName'] = module.params.get('function_name')
-
-    if module.params.get('max_items'):
-        params['MaxItems'] = module.params.get('max_items')
-
-    if module.params.get('next_marker'):
-        params['Marker'] = module.params.get('next_marker')
-
-    try:
-        lambda_facts.update(client.list_event_source_mappings(**params))
-    except (BotoServerError, ClientError), e:
-        module.fail_json(msg='Unable to get source event mappings, error: {0}'.format(e))
 
     return lambda_facts
 
@@ -147,11 +218,10 @@ def version_details(client, module):
 
 
 def main():
-    argument_spec = dict()
+    argument_spec = ec2_argument_spec()
     argument_spec.update(dict(
-            aws_profile=dict(required=False, default=None),
             function_name=dict(required=False, default=None),
-            query=dict(required=False, choices=['all', 'config', 'aliases', 'policy', 'mappings', 'versions'], default='all'),
+            query=dict(required=False, choices=['aliases', 'all', 'config', 'mappings', 'policy',  'versions'], default='all'),
             max_items=dict(type='int'),
             next_marker=dict()
         )
@@ -181,15 +251,16 @@ def main():
     client = boto3.client('lambda')
 
     invocations = {
-        'config': config_details,
         'aliases': alias_details,
-        'policy': policy_details,
-        'mappings': mapping_details,
-        'versions': version_details,
         'all': all_details,
+        'config': config_details,
+        'mappings': mapping_details,
+        'policy': policy_details,
+        'versions': version_details,
     }
     lambda_facts = invocations[module.params.get('query')](client, module)
 
+    # remove unnecessary ResponseMetadata from ansible facts before returning results
     if 'ResponseMetadata' in lambda_facts:
         del lambda_facts['ResponseMetadata']
     results = dict(ansible_facts=lambda_facts, changed=False)
@@ -198,6 +269,7 @@ def main():
 
 # ansible import module(s) kept at ~eof as recommended
 from ansible.module_utils.basic import *
+from ansible.module_utils.ec2 import *
 
 if __name__ == '__main__':
     main()
