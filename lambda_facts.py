@@ -15,11 +15,14 @@
 # along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
 
 DOCUMENTATION = '''
+---
 module: lambda_facts
 short_description: Retrieves AWS Lambda function details using AWS methods (boto3)
 description:
     - Gets various details related to Lambda functions, including aliases, versions and event source mappings
-version_added: "1.0"
+version_added: "2.0"
+author: Pierre Jodouin (@pjodouin)
+requirements: [ boto, botocore, boto3 ]
 options:
   query:
     description:
@@ -49,8 +52,8 @@ options:
         another request can be sent using the NextMarker entry from the first response
         to get the next page of results"
     required: false
-author: Pierre Jodouin(@pjodouin)
-extends_documentation_fragment: aws
+extends_documentation_fragment:
+  - aws
 '''
 
 EXAMPLES = '''
@@ -75,9 +78,16 @@ EXAMPLES = '''
   debug: var=Versions
 '''
 
+RETURN = '''
+ansible_facts:
+    description: lambda function related facts
+    type: dict
+'''
+
 try:
+    import boto
     import boto3
-    from boto.exception import BotoServerError
+    from boto.exception import BotoServerError, NoAuthHandlerFound
     from botocore.exceptions import ClientError
     HAS_BOTO3 = True
 except ImportError:
@@ -85,6 +95,13 @@ except ImportError:
 
 
 def alias_details(client, module):
+    '''
+    Returns list of aliases for a specified function.
+
+    :param client: AWS API client reference (boto3)
+    :param module: Ansible module reference
+    :return dict:
+    '''
 
     lambda_facts = dict()
 
@@ -107,6 +124,13 @@ def alias_details(client, module):
 
 
 def all_details(client, module):
+    '''
+    Returns all lambda related facts.
+
+    :param client: AWS API client reference (boto3)
+    :param module: Ansible module reference
+    :return dict:
+    '''
 
     if module.params.get('max_items') or module.params.get('next_marker'):
         module.fail_json(msg='Cannot specify max_items nor next_marker for query=all.')
@@ -127,6 +151,13 @@ def all_details(client, module):
 
 
 def config_details(client, module):
+    '''
+    Returns configuration details for one or all lambda functions.
+
+    :param client: AWS API client reference (boto3)
+    :param module: Ansible module reference
+    :return dict:
+    '''
 
     lambda_facts = dict()
 
@@ -153,6 +184,13 @@ def config_details(client, module):
 
 
 def mapping_details(client, module):
+    '''
+    Returns all lambda event source mappings.
+
+    :param client: AWS API client reference (boto3)
+    :param module: Ansible module reference
+    :return dict:
+    '''
 
     lambda_facts = dict()
     params = dict()
@@ -175,6 +213,13 @@ def mapping_details(client, module):
 
 
 def policy_details(client, module):
+    '''
+    Returns policy attached to a lambda function.
+
+    :param client: AWS API client reference (boto3)
+    :param module: Ansible module reference
+    :return dict:
+    '''
 
     if module.params.get('max_items') or module.params.get('next_marker'):
         module.fail_json(msg='Cannot specify max_items nor next_marker for query=policy.')
@@ -195,6 +240,13 @@ def policy_details(client, module):
 
 
 def version_details(client, module):
+    '''
+    Returns all lambda function versions.
+
+    :param client: AWS API client reference (boto3)
+    :param module: Ansible module reference
+    :return dict:
+    '''
 
     lambda_facts = dict()
 
@@ -218,6 +270,11 @@ def version_details(client, module):
 
 
 def main():
+    '''
+    Main entry point.
+
+    :return dict: ansible facts
+    '''
     argument_spec = ec2_argument_spec()
     argument_spec.update(dict(
             function_name=dict(required=False, default=None),
@@ -248,7 +305,13 @@ def main():
         if len(function_name) > 64:
             module.fail_json(msg='Function name "{0}" exceeds 64 character limit'.format(function_name))
 
-    client = boto3.client('lambda')
+    try:
+        #TODO: don't want to use devel branch so wait until boto3_connect is in main release branch -- use boto3.client until then
+        # region, ec2_url, aws_connect_kwargs = get_aws_connection_info(module)
+        # client = boto_conn(module, conn_type='client', resource='lambda', region=region, endpoint=ec2_url, **aws_connect_kwargs)
+        client = boto3.client('lambda')
+    except NoAuthHandlerFound, e:
+        module.fail_json(msg="Can't authorize connection - {0}".format(e))
 
     invocations = {
         'aliases': alias_details,
