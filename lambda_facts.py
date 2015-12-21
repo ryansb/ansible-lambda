@@ -104,11 +104,11 @@ def policy_details(client, module):
 def mapping_details(client, module):
 
     lambda_facts = dict()
+    params = dict()
 
     if module.params.get('function_name'):
-        module.fail_json(msg='Invalid parameter function_name for mappings query.')
+        params['FunctionName'] = module.params.get('function_name')
 
-    params = dict()
     if module.params.get('max_items'):
         params['MaxItems'] = module.params.get('max_items')
 
@@ -118,8 +118,7 @@ def mapping_details(client, module):
     try:
         lambda_facts.update(client.list_event_source_mappings(**params))
     except (BotoServerError, ClientError), e:
-        module.fail_json(msg=str(e))
-
+        module.fail_json(msg='Unable to get source event mappings, error: {0}'.format(e))
 
     return lambda_facts
 
@@ -140,7 +139,9 @@ def version_details(client, module):
         try:
             lambda_facts.update(client.list_versions_by_function(FunctionName=function_name, **params))
         except (BotoServerError, ClientError), e:
-            module.fail_json(msg=str(e))
+            module.fail_json(msg='Unable to get {0} versions, error: {1}'.format(function_name, e))
+    else:
+        module.fail_json(msg='Parameter function_name required for query=versions.')
 
     return lambda_facts
 
@@ -150,7 +151,6 @@ def main():
     argument_spec.update(dict(
             aws_profile=dict(required=False, default=None),
             function_name=dict(required=False, default=None),
-            # show_versions=dict(required=False, default=False, type='bool'),
             query=dict(required=False, choices=['all', 'config', 'aliases', 'policy', 'mappings', 'versions'], default='all'),
             max_items=dict(type='int'),
             next_marker=dict()
