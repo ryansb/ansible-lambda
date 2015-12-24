@@ -94,7 +94,7 @@ except ImportError:
     HAS_BOTO3 = False
 
 
-def alias_details(client, module):
+def alias_resource(client, module):
     '''
     Returns list of aliases for a specified function.
 
@@ -134,22 +134,30 @@ def lambda_code(client, module):
 
     lambda_facts = dict()
     params = dict()
+    results = dict()
 
     code = module.params.get('code')
     state = module.params.get('state')
 
     current_state = None
+    last_modified = None
     # check if function exists
     try:
         response = client.get_function_configuration(FunctionName=module.params['function_name'])
         current_state = 'present'
+        last_modified = response.get('LastModified')
+    #     if last_modified:
+    #         current_state = 'updated'
     except ClientError, e:
         if e.response['Error']['Code'] == 'ResourceNotFoundException':
             current_state = 'absent'
+            last_modified = None
         else:
             module.fail_json(msg='Boto3 Client error: {0}'.format(e))
 
     if state == current_state:
+        changed = False
+    elif state == 'present' and current_state == 'updated':
         changed = False
     else:
         if state == 'absent':
@@ -181,7 +189,21 @@ def lambda_code(client, module):
                 module.fail_json(msg='Boto3 Client error: {0}'.format(e))
         else:  # state == 'updated'
             # update the function if necessary
-            changed = True
+            if current_state == 'absent':
+                module.fail_json(msg='Function {0} does not exist--must create before.'.format(module.params.get('function_name')))
+
+            try:
+                results = client.update_function_configuration(
+                    FunctionName=module.params.get('function_name'),
+                    Role=module.params.get('role'),
+                    Handler=module.params.get('handler'),
+                    Description=module.params.get('description'),
+                    Timeout=module.params.get('timeout'),
+                    MemorySize=module.params.get('memory_size')
+                )
+                changed = True
+            except ClientError, e:
+                module.fail_json(msg='Boto3 Client error: {0}'.format(e))
 
     # if function_name:
     #     lambda_facts.update(config_details(client, module))
@@ -192,7 +214,12 @@ def lambda_code(client, module):
     #     lambda_facts.update(config_details(client, module))
     #     lambda_facts.update(mapping_details(client, module))
 
-    return dict(changed=changed, code=dict(state=state, function_name=module.params['function_name']))
+    return dict(changed=changed,
+                code=dict(state=state,
+                          last_mofidied=results.get('LastModified') or last_modified,
+                          function_name=module.params['function_name']
+                          )
+                )
 
 
 def config_details(client, module):
@@ -228,7 +255,7 @@ def config_details(client, module):
     return lambda_facts
 
 
-def mapping_details(client, module):
+def mapping_resource(client, module):
     '''
     Returns all lambda event source mappings.
 
@@ -257,7 +284,7 @@ def mapping_details(client, module):
     return lambda_facts
 
 
-def policy_details(client, module):
+def policy_resource(client, module):
     '''
     Returns policy attached to a lambda function.
 
@@ -322,7 +349,7 @@ def main():
     '''
     argument_spec = ec2_argument_spec()
     argument_spec.update(dict(
-        state=dict(default=None, required=True, choices=['present', 'absent', 'update']),
+        state=dict(default=None, required=True, choices=['present', 'absent', 'updated']),
         function_name=dict(required=False, default=None),
         type=dict(default=None, required=True, choices=['alias', 'code', 'config', 'mapping', 'policy', 'version']),
         runtime=dict(default=None, required=True, choices=['java8', 'nodejs', 'python2.7']),
@@ -370,11 +397,11 @@ def main():
         module.fail_json(msg="Can't authorize connection - {0}".format(e))
 
     invocations = {
-        'alias': alias_details,
+        'alias': alias_resource,
         'code': lambda_code,
         'config': config_details,
-        'mapping': mapping_details,
-        'policy': policy_details,
+        'mapping': mapping_resource,
+        'policy': policy_resource,
         'version': version_details,
     }
     lambda_facts = invocations[module.params.get('type')](client, module)
