@@ -106,6 +106,9 @@ def alias_resource(client, module):
         module.fail_json(msg='Parameter name required for resource type alias.')
 
     current_state = None
+    changed = False
+    response = dict()
+
     # check if function exists
     try:
         response = client.get_alias(
@@ -137,7 +140,7 @@ def alias_resource(client, module):
 
             version = module.params.get('version')
             if not version:
-                module.fail_json(msg='Parameter version required for resource type alias.')
+                module.fail_json(msg='Parameter version required to create resource type alias.')
 
             changed = False
             response = dict()
@@ -150,10 +153,28 @@ def alias_resource(client, module):
                 )
                 changed = True
             except ClientError, e:
-                if e.response['Error']['Code'] == 'ResourceConflictException':
-                    changed = False
-                else:
-                    module.fail_json(msg='Unable to create alias {0} for {1}:{2}, error: {3}'.format(name, function_name, version, e))
+                module.fail_json(msg='Unable to create alias {0} for {1}:{2}, error: {3}'.format(name, function_name, version, e))
+
+        else:  # state == 'updated'
+            # update the function if necessary
+            if current_state == 'absent':
+                module.fail_json(msg='Function {0} does not exist--must create before.'.format(module.params.get('function_name')))
+
+            version = module.params.get('version')
+            if not version:
+                module.fail_json(msg='Parameter version required to update resource type alias.')
+
+            try:
+                response = client.update_alias(
+                    FunctionName=function_name,
+                    Name=name,
+                    FunctionVersion=version,
+                    Description=module.params.get('description')
+
+                )
+                changed = True
+            except ClientError, e:
+                module.fail_json(msg='Boto3 Client error: {0}'.format(e))
 
     return dict(changed=changed, response=response)
 
@@ -190,8 +211,6 @@ def lambda_code(client, module):
             module.fail_json(msg='Boto3 Client error: {0}'.format(e))
 
     if state == current_state:
-        changed = False
-    elif state == 'present' and current_state == 'updated':
         changed = False
     else:
         if state == 'absent':
@@ -318,22 +337,89 @@ def policy_resource(client, module):
     :return dict:
     """
 
-    if module.params.get('max_items') or module.params.get('next_marker'):
-        module.fail_json(msg='Cannot specify max_items nor next_marker for query=policy.')
-
-    lambda_facts = dict()
-
+    state = module.params.get('state')
     function_name = module.params.get('function_name')
-    if function_name:
-        try:
-            # get_policy returns a JSON string so must convert to dict before reassigning to its key
-            lambda_facts.update(Policy=json.loads(client.get_policy(FunctionName=function_name)['Policy']))
-        except ClientError, e:
-            module.fail_json(msg='Unable to get {0} policy, error: {1}'.format(function_name, e))
-    else:
-        module.fail_json(msg='Parameter function_name required for query=policy.')
+    qualifier = module.params.get('qualifier')
+    if not function_name:
+        module.fail_json(msg='Parameter function_name required for resource type policy.')
 
-    return lambda_facts
+    current_state = None
+    changed = False
+    response = dict()
+
+    # check if function exists
+    try:
+        # get_policy returns a JSON string so must convert to dict before reassigning to its key
+        response = client.get_policy(
+            FunctionName=function_name,
+            Qualifier=qualifier
+        )
+        response['Policy'] = json.loads(response.get('Policy', '{}'))
+        current_state = 'present'
+    except ClientError, e:
+        if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            current_state = 'absent'
+        else:
+            module.fail_json(msg='Boto3 Client error: {0}'.format(e))
+
+    if state == current_state:
+        changed = False
+    else:
+        if state == 'absent':
+
+            statement_id = module.params.get('statement_id')
+            if not statement_id:
+                module.fail_json(msg='Parameter statement_id required to remove resource type policy.')
+
+            # remove permission
+            try:
+                response = client.remove_permission(
+                    FunctionName=function_name,
+                    StatementId=statement_id,
+                    Qualifier=qualifier
+                )
+                changed = True
+            except ClientError, e:
+                module.fail_json(msg='Boto3 Client error: {0}'.format(e))
+
+        elif state in ('present', 'updated'):
+
+            statement_id = module.params.get('statement_id')
+            if not statement_id:
+                module.fail_json(msg='Parameter statement_id required to add permission to policy-type resource.')
+
+            action = module.params.get('action')
+            if not action:
+                module.fail_json(msg='Parameter action required to add permission to policy-type resource.')
+
+            principal = module.params.get('principal')
+            if not principal:
+                module.fail_json(msg='Parameter principal required to add permission to policy-type resource.')
+
+            qualifier = module.params.get('qualifier')
+            source_arn = module.params.get('source_arn')
+            source_account = module.params.get('qualifier')
+
+            try:
+                response = client.add_permission(
+                    FunctionName=function_name,
+                    StatementId=statement_id,
+                    Qualifier=qualifier,
+                    Action=action,
+                    Principal=principal,
+                    # SourceArn=source_arn,
+                    # SourceAccount=source_account
+                )
+                changed = True
+            except ClientError, e:
+                module.fail_json(msg='Unable to add permission to {0} to {1}:{2}, error: {3}'.format(statement_id, function_name, qualifier, e))
+
+        else:  # state == 'updated'
+            # update the function if necessary
+            #TODO needs to be completed
+            pass
+
+    return dict(changed=changed, response=response)
 
 
 def version_details(client, module):
@@ -386,8 +472,13 @@ def main():
         memory_size=dict(type='int', default=128, required=False),
         publish=dict(type='bool', default=True, required=False),
         name=dict(default=None, required=False),
-        version=dict(default=None, required=False)
-
+        version=dict(default=None, required=False),
+        qualifier=dict(default=None, required=False),
+        statement_id=dict(default=None, required=False),
+        action=dict(default=None, required=False),
+        principal=dict(default=None, required=False),
+        source_account=dict(default=None, required=False),
+        source_arn=dict(default=None, required=False),
         )
     )
 

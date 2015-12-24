@@ -95,13 +95,13 @@ except ImportError:
 
 
 def alias_details(client, module):
-    '''
+    """
     Returns list of aliases for a specified function.
 
     :param client: AWS API client reference (boto3)
     :param module: Ansible module reference
     :return dict:
-    '''
+    """
 
     lambda_facts = dict()
 
@@ -124,13 +124,13 @@ def alias_details(client, module):
 
 
 def all_details(client, module):
-    '''
+    """
     Returns all lambda related facts.
 
     :param client: AWS API client reference (boto3)
     :param module: Ansible module reference
     :return dict:
-    '''
+    """
 
     if module.params.get('max_items') or module.params.get('next_marker'):
         module.fail_json(msg='Cannot specify max_items nor next_marker for query=all.')
@@ -151,13 +151,13 @@ def all_details(client, module):
 
 
 def config_details(client, module):
-    '''
+    """
     Returns configuration details for one or all lambda functions.
 
     :param client: AWS API client reference (boto3)
     :param module: Ansible module reference
     :return dict:
-    '''
+    """
 
     lambda_facts = dict()
 
@@ -184,13 +184,13 @@ def config_details(client, module):
 
 
 def mapping_details(client, module):
-    '''
+    """
     Returns all lambda event source mappings.
 
     :param client: AWS API client reference (boto3)
     :param module: Ansible module reference
     :return dict:
-    '''
+    """
 
     lambda_facts = dict()
     params = dict()
@@ -213,13 +213,13 @@ def mapping_details(client, module):
 
 
 def policy_details(client, module):
-    '''
+    """
     Returns policy attached to a lambda function.
 
     :param client: AWS API client reference (boto3)
     :param module: Ansible module reference
     :return dict:
-    '''
+    """
 
     if module.params.get('max_items') or module.params.get('next_marker'):
         module.fail_json(msg='Cannot specify max_items nor next_marker for query=policy.')
@@ -240,13 +240,13 @@ def policy_details(client, module):
 
 
 def version_details(client, module):
-    '''
+    """
     Returns all lambda function versions.
 
     :param client: AWS API client reference (boto3)
     :param module: Ansible module reference
     :return dict:
-    '''
+    """
 
     lambda_facts = dict()
 
@@ -270,11 +270,11 @@ def version_details(client, module):
 
 
 def main():
-    '''
+    """
     Main entry point.
 
     :return dict: ansible facts
-    '''
+    """
     argument_spec = ec2_argument_spec()
     argument_spec.update(dict(
             function_name=dict(required=False, default=None),
