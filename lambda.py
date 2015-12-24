@@ -17,24 +17,25 @@
 DOCUMENTATION = '''
 ---
 module: lambda
-short_description: Retrieves AWS Lambda function details using AWS methods (boto3)
+short_description: Creates/Updates/Deletes AWS Lambda functions, related configs, aliases, mappings... etc.
+    using AWS API methods (boto3)
 description:
     - Gets various details related to Lambda functions, including aliases, versions and event source mappings
 version_added: "2.0"
 author: Pierre Jodouin (@pjodouin)
-requirements: [ boto, botocore, boto3 ]
+requirements: [ botocore, boto3 ]
 options:
-  query:
+  type:
     description:
-      - specifies the query action to take
+      - specifies the resource type on which to take action
     required: False
     choices: [
-            'aliases',
-            'all',
+            'alias',
+            'code',
             'config',
-            'mappings',
+            'mapping',
             'policy',
-            'versions',
+            'version',
             ],
     default: 'all'
   function_name:
@@ -52,42 +53,34 @@ options:
         another request can be sent using the NextMarker entry from the first response
         to get the next page of results"
     required: false
+
+  state:
+  runtime:
+  code:
+  handler:
+  role:
+  timeout:
+  memory:
+  publish: ???
+
 extends_documentation_fragment:
   - aws
 '''
 
 EXAMPLES = '''
-# Simple example of listing all info for a function
-- name: List all for a specific function
-  lambda_facts:
-    query: all
-    function_name: myFunction
-  register: my_function_details
-# List all versions of a function
-- name: List function versions
-  lambda_facts:
-    query: versions
-    function_name: myFunction
-  register: my_function_versions
-# List all lambda functions
-- name: List all functions
-  lambda_facts:
-    query: versions
-    max_items: 20
-- name: show Lambda facts
-  debug: var=Versions
+# Simple example of
 '''
 
 RETURN = '''
 ansible_facts:
-    description: lambda function related facts
+    description: ?? lambda function related facts ??
     type: dict
 '''
 
 try:
     # import boto
     import boto3
-    from boto.exception import BotoServerError, NoAuthHandlerFound
+    # from boto.exception import BotoServerError, NoAuthHandlerFound
     from botocore.exceptions import *
     HAS_BOTO3 = True
 except ImportError:
@@ -95,45 +88,85 @@ except ImportError:
 
 
 def alias_resource(client, module):
-    '''
-    Returns list of aliases for a specified function.
+    """
+    Adds, updates or deletes lambda function aliases for specified version.
 
     :param client: AWS API client reference (boto3)
     :param module: Ansible module reference
     :return dict:
-    '''
+    """
 
-    lambda_facts = dict()
-
+    state = module.params.get('state')
     function_name = module.params.get('function_name')
-    if function_name:
-        params = dict()
-        if module.params.get('max_items'):
-            params['MaxItems'] = module.params.get('max_items')
+    if not function_name:
+        module.fail_json(msg='Parameter function_name required for resource type alias.')
 
-        if module.params.get('next_marker'):
-            params['Marker'] = module.params.get('next_marker')
-        try:
-            lambda_facts.update(client.list_aliases(FunctionName=function_name, **params))
-        except (BotoServerError, ClientError), e:
-            module.fail_json(msg='Unable to get {0} aliases, error: {1}'.format(function_name, e))
+    name = module.params.get('name')
+    if not name:
+        module.fail_json(msg='Parameter name required for resource type alias.')
+
+    current_state = None
+    # check if function exists
+    try:
+        response = client.get_alias(
+            FunctionName=function_name,
+            Name=name,
+        )
+        current_state = 'present'
+    except ClientError, e:
+        if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            current_state = 'absent'
+        else:
+            module.fail_json(msg='Boto3 Client error: {0}'.format(e))
+
+    if state == current_state:
+        changed = False
     else:
-        module.fail_json(msg='Parameter function_name required for query=aliases.')
+        if state == 'absent':
+            # delete function
+            try:
+                results = client.delete_alias(
+                    FunctionName=function_name,
+                    Name=name
+                )
+                changed = True
+            except ClientError, e:
+                module.fail_json(msg='Boto3 Client error: {0}'.format(e))
 
-    return lambda_facts
+        elif state == 'present':
+
+            version = module.params.get('version')
+            if not version:
+                module.fail_json(msg='Parameter version required for resource type alias.')
+
+            changed = False
+            response = dict()
+            try:
+                response = client.create_alias(
+                    FunctionName=function_name,
+                    Name=name,
+                    FunctionVersion=version,
+                    Description=module.params.get('description')
+                )
+                changed = True
+            except ClientError, e:
+                if e.response['Error']['Code'] == 'ResourceConflictException':
+                    changed = False
+                else:
+                    module.fail_json(msg='Unable to create alias {0} for {1}:{2}, error: {3}'.format(name, function_name, version, e))
+
+    return dict(changed=changed, response=response)
 
 
 def lambda_code(client, module):
-    '''
+    """
     Adds, updates or deletes lambda function code.
 
     :param client: AWS API client reference (boto3)
     :param module: Ansible module reference
     :return dict:
-    '''
+    """
 
-    lambda_facts = dict()
-    params = dict()
     results = dict()
 
     code = module.params.get('code')
@@ -146,8 +179,9 @@ def lambda_code(client, module):
         response = client.get_function_configuration(FunctionName=module.params['function_name'])
         current_state = 'present'
         last_modified = response.get('LastModified')
-    #     if last_modified:
-    #         current_state = 'updated'
+        #TODO: need to determine how to retain short-term 'updated' state--will continusouly update until then
+        #     if last_modified:
+        #         current_state = 'updated'
     except ClientError, e:
         if e.response['Error']['Code'] == 'ResourceNotFoundException':
             current_state = 'absent'
@@ -205,15 +239,6 @@ def lambda_code(client, module):
             except ClientError, e:
                 module.fail_json(msg='Boto3 Client error: {0}'.format(e))
 
-    # if function_name:
-    #     lambda_facts.update(config_details(client, module))
-    #     lambda_facts.update(alias_details(client, module))
-    #     lambda_facts.update(policy_details(client, module))
-    #     lambda_facts.update(version_details(client, module))
-    # else:
-    #     lambda_facts.update(config_details(client, module))
-    #     lambda_facts.update(mapping_details(client, module))
-
     return dict(changed=changed,
                 code=dict(state=state,
                           last_mofidied=results.get('LastModified') or last_modified,
@@ -223,13 +248,13 @@ def lambda_code(client, module):
 
 
 def config_details(client, module):
-    '''
+    """
     Returns configuration details for one or all lambda functions.
 
     :param client: AWS API client reference (boto3)
     :param module: Ansible module reference
     :return dict:
-    '''
+    """
 
     lambda_facts = dict()
 
@@ -237,7 +262,7 @@ def config_details(client, module):
     if function_name:
         try:
             lambda_facts.update(client.get_function_configuration(FunctionName=function_name))
-        except (BotoServerError, ClientError), e:
+        except ClientError, e:
             module.fail_json(msg='Unable to get {0} configuration, error: {1}'.format(function_name, e))
     else:
         params = dict()
@@ -256,13 +281,13 @@ def config_details(client, module):
 
 
 def mapping_resource(client, module):
-    '''
+    """
     Returns all lambda event source mappings.
 
     :param client: AWS API client reference (boto3)
     :param module: Ansible module reference
     :return dict:
-    '''
+    """
 
     lambda_facts = dict()
     params = dict()
@@ -278,20 +303,20 @@ def mapping_resource(client, module):
 
     try:
         lambda_facts.update(client.list_event_source_mappings(**params))
-    except (BotoServerError, ClientError), e:
+    except ClientError, e:
         module.fail_json(msg='Unable to get source event mappings, error: {0}'.format(e))
 
     return lambda_facts
 
 
 def policy_resource(client, module):
-    '''
+    """
     Returns policy attached to a lambda function.
 
     :param client: AWS API client reference (boto3)
     :param module: Ansible module reference
     :return dict:
-    '''
+    """
 
     if module.params.get('max_items') or module.params.get('next_marker'):
         module.fail_json(msg='Cannot specify max_items nor next_marker for query=policy.')
@@ -303,7 +328,7 @@ def policy_resource(client, module):
         try:
             # get_policy returns a JSON string so must convert to dict before reassigning to its key
             lambda_facts.update(Policy=json.loads(client.get_policy(FunctionName=function_name)['Policy']))
-        except (BotoServerError, ClientError), e:
+        except ClientError, e:
             module.fail_json(msg='Unable to get {0} policy, error: {1}'.format(function_name, e))
     else:
         module.fail_json(msg='Parameter function_name required for query=policy.')
@@ -312,13 +337,13 @@ def policy_resource(client, module):
 
 
 def version_details(client, module):
-    '''
+    """
     Returns all lambda function versions.
 
     :param client: AWS API client reference (boto3)
     :param module: Ansible module reference
     :return dict:
-    '''
+    """
 
     lambda_facts = dict()
 
@@ -333,7 +358,7 @@ def version_details(client, module):
 
         try:
             lambda_facts.update(client.list_versions_by_function(FunctionName=function_name, **params))
-        except (BotoServerError, ClientError), e:
+        except ClientError, e:
             module.fail_json(msg='Unable to get {0} versions, error: {1}'.format(function_name, e))
     else:
         module.fail_json(msg='Parameter function_name required for query=versions.')
@@ -342,24 +367,26 @@ def version_details(client, module):
 
 
 def main():
-    '''
+    """
     Main entry point.
 
     :return dict: ansible facts
-    '''
+    """
     argument_spec = ec2_argument_spec()
     argument_spec.update(dict(
         state=dict(default=None, required=True, choices=['present', 'absent', 'updated']),
         function_name=dict(required=False, default=None),
         type=dict(default=None, required=True, choices=['alias', 'code', 'config', 'mapping', 'policy', 'version']),
-        runtime=dict(default=None, required=True, choices=['java8', 'nodejs', 'python2.7']),
-        role=dict(default=None, required=True),
-        handler=dict(default=None, required=True),
-        code=dict(type='dict', default=None, required=True),
+        runtime=dict(default=None, required=False),
+        role=dict(default=None, required=False),
+        handler=dict(default=None, required=False),
+        code=dict(type='dict', default=None, required=False),
         description=dict(default=None, required=False),
         timeout=dict(type='int', default=3, required=False),
         memory_size=dict(type='int', default=128, required=False),
-        publish=dict(type='bool', default=True, required=False)
+        publish=dict(type='bool', default=True, required=False),
+        name=dict(default=None, required=False),
+        version=dict(default=None, required=False)
 
         )
     )
@@ -393,7 +420,7 @@ def main():
         # region, ec2_url, aws_connect_kwargs = get_aws_connection_info(module)
         # client = boto_conn(module, conn_type='client', resource='lambda', region=region, endpoint=ec2_url, **aws_connect_kwargs)
         client = boto3.client('lambda')
-    except NoAuthHandlerFound, e:
+    except Exception, e:
         module.fail_json(msg="Can't authorize connection - {0}".format(e))
 
     invocations = {
