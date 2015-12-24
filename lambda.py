@@ -407,8 +407,8 @@ def policy_resource(client, module):
                     Qualifier=qualifier,
                     Action=action,
                     Principal=principal,
-                    # SourceArn=source_arn,
-                    # SourceAccount=source_account
+                    SourceArn=source_arn,
+                    SourceAccount=source_account
                 )
                 changed = True
             except ClientError, e:
