@@ -17,25 +17,47 @@ Add, Update or Delete Lambda related resources.
 
 ## Playbook Examples
 
-`
+```yaml
 ---
-\# Simple example of listing all info for a function
+# Simple example of listing all info for a function
 - name: List all for a specific function
   lambda_facts:
     query: all
     function_name: myFunction
   register: my_function_details
-\# List all versions of a function
+# List all versions of a function
 - name: List function versions
   lambda_facts:
     query: versions
     function_name: myFunction
   register: my_function_versions
-\# List all lambda functions
+# List all lambda functions
 - name: List all functions
   lambda_facts:
     query: versions
     max_items: 20
 - name: show Lambda facts
   debug: var=Versions
-`
+```
+
+## indented
+    ---
+    # Simple example of listing all info for a function
+    - name: List all for a specific function
+      lambda_facts:
+        query: all
+        function_name: myFunction
+      register: my_function_details
+    # List all versions of a function
+    - name: List function versions
+      lambda_facts:
+        query: versions
+        function_name: myFunction
+      register: my_function_versions
+    # List all lambda functions
+    - name: List all functions
+      lambda_facts:
+        query: versions
+        max_items: 20
+    - name: show Lambda facts
+      debug: var=Versions
