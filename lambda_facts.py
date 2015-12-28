@@ -17,41 +17,44 @@
 DOCUMENTATION = '''
 ---
 module: lambda_facts
-short_description: Retrieves AWS Lambda function details using AWS methods (boto3)
+short_description: Gathers AWS Lambda function details as Ansible facts 
 description:
-    - Gets various details related to Lambda functions, including aliases, versions and event source mappings
+    - Gathers various details related to Lambda functions, including aliases, versions and event source mappings.
 version_added: "2.0"
 author: Pierre Jodouin (@pjodouin)
-requirements: [ boto, botocore, boto3 ]
+requirements: [ boto3 ]
 options:
   query:
     description:
-      - specifies the query action to take
-    required: False
+      - Specifies the resource type for which to gather facts.  Leave blank to retrieve all facts.
+    required: false
     choices: [
-            'aliases',
-            'all',
-            'config',
-            'mappings',
-            'policy',
-            'versions',
-            ],
-    default: 'all'
+            "aliases",
+            "all",
+            "config",
+            "mappings",
+            "policy",
+            "versions",
+            ]
+    default: "all"
   function_name:
     description:
-      - The name of the lambda function.
-     required: false
+      - The name of the lambda function for which facts are requested.
+    required: false
+    default: none
   max_items:
     description:
-      - Maximum number of items to return for various list requests
+      - Maximum number of items to return for various fact requests.
     required: false
+    default: none
   next_marker:
     description:
       - "Some queries such as 'versions' or 'mappings' will return a maximum
         number of entries - EG 100. If the number of entries exceeds this maximum
         another request can be sent using the NextMarker entry from the first response
-        to get the next page of results"
+        to get the next page of results."
     required: false
+    default: none
 extends_documentation_fragment:
   - aws
 '''
