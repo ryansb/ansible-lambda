@@ -60,6 +60,7 @@ extends_documentation_fragment:
 '''
 
 EXAMPLES = '''
+---
 # Simple example of listing all info for a function
 - name: List all for a specific function
   lambda_facts:

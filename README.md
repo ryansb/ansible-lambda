@@ -15,6 +15,14 @@ Add, Update or Delete Lambda related resources.
 
 `> ansible localhost -m lambda -a"state=present function_name=myFunction"`
 
+## Installation
+
+Until this custom module is included in the Ansible distro, do the following to install the lambda modules in your Ansible environment:
+
+1. Clone this repository or download the ZIP file.
+
+2. copy the *.py modules to your installation custom module directory (usually /etc/ansible/modules).
+
 
 ## Playbook Syntax
 
