@@ -17,31 +17,30 @@
 DOCUMENTATION = '''
 ---
 module: lambda
-short_description: Creates/Updates/Deletes AWS Lambda functions, related configs, aliases, mappings... etc.
-    using AWS API methods (boto3)
+short_description: Creates/Updates/Deletes AWS Lambda functions, related configs, aliases and mappings.
 description:
     - Gets various details related to Lambda functions, including aliases, versions and event source mappings
 version_added: "2.0"
 author: Pierre Jodouin (@pjodouin)
-requirements: [ botocore, boto3 ]
+requirements: [ boto3 ]
 options:
   type:
     description:
       - specifies the resource type on which to take action
-    required: False
+    required: false
     choices: [
-            'alias',
-            'code',
-            'config',
-            'mapping',
-            'policy',
-            'version',
-            ],
-    default: 'all'
+            "alias",
+            "code",
+            "config",
+            "mapping",
+            "policy",
+            "version",
+            ]
+    default: "all"
   function_name:
     description:
       - The name of the lambda function.
-     required: false
+    required: false
   max_items:
     description:
       - Maximum number of items to return for various list requests
@@ -53,28 +52,69 @@ options:
         another request can be sent using the NextMarker entry from the first response
         to get the next page of results"
     required: false
-
   state:
+    description:
+      - State
+    required: false
   runtime:
+    description:
+      - Runtime
+    required: false
   code:
+    description:
+      - Code
+    required: false
   handler:
+    description:
+      - Handler
+    required: false
   role:
+    description:
+      - Role
+    required: false
   timeout:
+    description:
+      - Timeout
+    required: false
   memory:
-  publish: ???
-
+    description:
+      - Memory
+    required: false
+  publish:
+    description:
+      - Publish
+    required: false
 extends_documentation_fragment:
   - aws
 '''
 
 EXAMPLES = '''
-# Simple example of
+---
+# Simple example of listing all info for a function
+- name: List all for a specific function
+  lambda_facts:
+    query: all
+    function_name: myFunction
+  register: my_function_details
+# List all versions of a function
+- name: List function versions
+  lambda_facts:
+    query: versions
+    function_name: myFunction
+  register: my_function_versions
+# List all lambda functions
+- name: List all functions
+  lambda_facts:
+    query: versions
+    max_items: 20
+- name: show Lambda facts
+  debug: var=Versions
 '''
 
 RETURN = '''
 ansible_facts:
-    description: ?? lambda function related facts ??
-    type: dict
+    description: lambda function related facts
+    type: dic
 '''
 
 try:
