@@ -27,7 +27,6 @@ Until this custom module is included in the Ansible distro, do the following to 
 ## Playbook Syntax
 
 ```yaml
----
 module: lambda_facts
 short_description: Gathers AWS Lambda function details as Ansible facts
 description:
@@ -74,7 +73,6 @@ extends_documentation_fragment:
 ## Playbook Examples
 
 ```yaml
----
 # Simple example of listing all info for a function
 - name: List all for a specific function
   lambda_facts:
