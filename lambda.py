@@ -130,35 +130,31 @@ extends_documentation_fragment:
 
 EXAMPLES = '''
 ---
-# Simple example of listing all info for a function
-- name: List all for a specific function
-  lambda_facts:
-    query: all
+# Simple example to create a function
+- name: Create Lambda Function
+  lambda:
+    type: code
     function_name: myFunction
+    state: present
+    runtime: python2.7
+    code:
+      S3Bucket: lambda-function-packages
+      S3Key: system1/lambda_deployment.zip
+    timeout: 3
+    handler: lambda.handler
+    role: arn:aws:iam::999999999999:role/API2LambdaExecRole
+    description: This is a Lambda function
+    publish: True
   register: my_function_details
-# List all versions of a function
-- name: List function versions
-  lambda_facts:
-    query: versions
-    function_name: myFunction
-  register: my_function_versions
-# List all lambda functions
-- name: List all functions
-  lambda_facts:
-    query: versions
-    max_items: 20
-- name: show Lambda facts
-  debug: var=Versions
 '''
 
 RETURN = '''
 ansible_facts:
     description: lambda function related facts
-    type: dic
+    type: dict
 '''
 
 try:
-    # import boto
     import boto3
     # from boto.exception import BotoServerError, NoAuthHandlerFound
     from botocore.exceptions import *
