@@ -17,9 +17,10 @@
 DOCUMENTATION = '''
 ---
 module: lambda
-short_description: Creates/Updates/Deletes AWS Lambda functions, related configs, aliases and mappings.
+short_description: Creates, updates or deletes AWS Lambda functions, related configs, aliases and mappings.
 description:
-    - Gets various details related to Lambda functions, including aliases, versions and event source mappings
+    - This module allows the mamangement of AWS Lambda functions and their related resources via the Ansible
+      framework.  It provides CRUD functionality, is idempotent and supports the "Check" state.
 version_added: "2.0"
 author: Pierre Jodouin (@pjodouin)
 requirements: [ boto3 ]
@@ -39,7 +40,12 @@ options:
     default: "all"
   function_name:
     description:
-      - The name of the lambda function.
+      - The name you want to assign to the function you are uploading. You can specify an unqualified function 
+        name (for example, "Thumbnail") or you can specify Amazon Resource Name (ARN) of the function 
+        (for example, "arn:aws:lambda:us-west-2:account-id:function:ThumbNail"). AWS Lambda also allows you to 
+        specify only the account ID qualifier (for example, "account-id:Thumbnail"). Note that the length 
+        constraint applies only to the ARN. If you specify only the function name, it is limited to 64 character 
+        in length.
     required: false
   max_items:
     description:
@@ -54,36 +60,70 @@ options:
     required: false
   state:
     description:
-      - State
+      - Describes the desired state of the resource and defaults to "present"
     required: false
+    default: "present"
+    choices: ["present", "absent", "updated"]
   runtime:
     description:
-      - Runtime
+      - Runtime environment of the Lambda function (e.g. nodejs, java, python2.7).   This field is not currently
+        edited and will allow any values since AWS will be adding more languages in the near future.
     required: false
   code:
     description:
-      - Code
+      - Dictionary of items which describe where to find the function code to be uploaded to AWS.  Typically, this
+        is a simple file or deployment package bundled in a ZIP archive file.
     required: false
   handler:
     description:
-      - Handler
+      - The function within your code that Lambda calls to begin execution. For Node.js, it is the 
+        module-name.*export* value in your function. For Java, it can be package.class-name::handler or 
+        package.class-name. 
     required: false
   role:
     description:
-      - Role
+      - The Amazon Resource Name (ARN) of the IAM role that Lambda assumes when it executes your function to access 
+        any other Amazon Web Services (AWS) resources.
     required: false
   timeout:
     description:
-      - Timeout
+      - The function execution time at which Lambda should terminate the function. Because the execution time has cost 
+        implications, we recommend you set this value based on your expected execution time. The default is 3 seconds.
     required: false
   memory:
     description:
-      - Memory
+      - The amount of memory, in MB, your Lambda function is given. Lambda uses this memory size to infer the amount of 
+        CPU and memory allocated to your function. Your function use-case determines your CPU and memory requirements. 
+        For example, a database operation might need less memory compared to an image processing function. The default 
+        value is 128 MB. The value must be a multiple of 64 MB.
     required: false
   publish:
     description:
-      - Publish
+      - This boolean parameter can be used to request AWS Lambda to create the Lambda function and publish a version as 
+        an atomic operation.
     required: false
+  description:
+    description:
+      - A short, user-defined function description. Lambda does not use this value. Assign a meaningful description 
+        as you see fit.
+    required: false
+  uuid:
+    description:
+      - The AWS Lambda assigned ID of the event source mapping.
+    required: false
+  alias_name:
+    description:
+      -  Name of the function alias.
+    required: false
+  version:
+    description:
+      -  Version number of the Lambda function.
+  qualifier:
+    description:
+      - You can specify this optional query parameter to specify function version or alias name in which case this 
+        API will return all permissions associated with the specific ARN. If you don't provide this parameter, the 
+        API will return permissions that apply to the unqualified function ARN.
+      - For usage with Policy resources.
 extends_documentation_fragment:
   - aws
 '''
@@ -507,11 +547,10 @@ def main():
         role=dict(default=None, required=False),
         handler=dict(default=None, required=False),
         code=dict(type='dict', default=None, required=False),
-        description=dict(default=None, required=False),
         timeout=dict(type='int', default=3, required=False),
         memory_size=dict(type='int', default=128, required=False),
         publish=dict(type='bool', default=True, required=False),
-        name=dict(default=None, required=False),
+        alias_name=dict(default=None, required=False),
         version=dict(default=None, required=False),
         qualifier=dict(default=None, required=False),
         statement_id=dict(default=None, required=False),
@@ -519,6 +558,8 @@ def main():
         principal=dict(default=None, required=False),
         source_account=dict(default=None, required=False),
         source_arn=dict(default=None, required=False),
+        description=dict(default=None, required=False),
+        uuid=dict(default=None, required=False)
         )
     )
 
