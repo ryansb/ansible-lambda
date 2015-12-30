@@ -58,3 +58,6 @@ target/
 
 # PyCharm stuff:
 .idea/
+
+# Mac OS/X stuff:
+.DS_store
