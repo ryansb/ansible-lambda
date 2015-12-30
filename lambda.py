@@ -166,6 +166,9 @@ except ImportError:
 def pc(identifier):
     """
     Changes python identifiers into Pascale Case identifiers.
+
+    :param identifier:
+    :return:
     """
 
     return "".join([token.capitalize() for token in identifier.split('_')])
@@ -174,7 +177,14 @@ def pc(identifier):
 def get_api_params(params, module, resource_type, required=False):
     """
     Check for presence of parameters, required or optional and fixup parameter case.
+
+    :param params: AWS API parameters
+    :param module: Ansible module reference
+    :param resource_type:
+    :param required:
+    :return:
     """
+
     api_params = dict()
 
     for param in params:
@@ -186,7 +196,6 @@ def get_api_params(params, module, resource_type, required=False):
                 module.fail_json(msg='Parameter {0} required for resource type {1}'.format(param, resource_type))
 
     return api_params
-
 
 
 def alias_resource(client, module):
@@ -290,6 +299,7 @@ def lambda_code(client, module):
     :return dict:
     """
     results = dict()
+    changed = False
     api_params = dict()
 
     state = module.params.get('state')
@@ -301,9 +311,9 @@ def lambda_code(client, module):
     last_modified = None
     # check if function exists and get facts
     try:
-        response = client.get_function_configuration(FunctionName=function_name)
+        results = client.get_function_configuration(FunctionName=function_name)
         current_state = 'present'
-        last_modified = response.get('LastModified')
+        last_modified = results.get('LastModified')
         #TODO: need to determine how to retain short-term 'updated' state--will continusouly update until then
         #     if last_modified:
         #         current_state = 'updated'
@@ -357,12 +367,7 @@ def lambda_code(client, module):
             except ClientError, e:
                 module.fail_json(msg='Boto3 Client error: {0}'.format(e))
 
-    return dict(changed=changed,
-                code=dict(state=state,
-                          last_mofidied=results.get('LastModified') or last_modified,
-                          function_name=module.params['function_name']
-                          )
-                )
+    return dict(changed=changed, results=results)
 
 
 def config_details(client, module):
@@ -622,13 +627,13 @@ def main():
         'policy': policy_resource,
         'version': version_details,
     }
-    lambda_facts = invocations[module.params.get('type')](client, module)
+    response = invocations[module.params.get('type')](client, module)
 
     # remove unnecessary ResponseMetadata from ansible facts before returning results
-    if 'ResponseMetadata' in lambda_facts:
-        del lambda_facts['ResponseMetadata']
-    changed = lambda_facts['changed']
-    results = dict(ansible_facts=lambda_facts, changed=changed)
+    if 'ResponseMetadata' in response:
+        del response['ResponseMetadata']
+
+    results = dict(ansible_facts=dict(results=response['results']), changed=response['changed'])
     module.exit_json(**results)
 
 
