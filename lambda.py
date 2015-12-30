@@ -213,11 +213,10 @@ def alias_resource(client, module):
     current_state = None
 
     state = module.params.get('state')
+    resource = "{0}::alias".format(module.params.get('name'))
 
     required_params = ('function_name', 'name')
     api_params.update(get_api_params(required_params, module, resource, required=True))
-
-    resource = "{0}::alias".format(module.params['name'])
 
     # check if alias exists
     try:
@@ -284,14 +283,13 @@ def lambda_code(client, module):
     last_modified = None
 
     state = module.params.get('state')
+    resource = "{0}::code".format(module.params.get('function_name'))
 
     required_params = ('function_name',)
     api_params.update(get_api_params(required_params, module, resource, required=True))
 
     optional_params = ('qualifier',)
     api_params.update(get_api_params(optional_params, module, resource, required=False))
-
-    resource = "{0}::code".format(module.params['function_name'])
 
     # check if function exists and get facts
     try:
