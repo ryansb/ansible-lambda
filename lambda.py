@@ -163,6 +163,32 @@ except ImportError:
     HAS_BOTO3 = False
 
 
+def pc(identifier):
+    """
+    Changes python identifiers into Pascale Case identifiers.
+    """
+
+    return "".join([token.capitalize() for token in identifier.split('_')])
+
+
+def get_api_params(params, module, resource_type, required=False):
+    """
+    Check for presence of parameters, required or optional and fixup parameter case.
+    """
+    api_params = dict()
+
+    for param in params:
+        value = module.params.get(param)
+        if value:
+            api_params[pc(param)] = value
+        else:
+            if required:
+                module.fail_json(msg='Parameter {0} required for resource type {1}'.format(param, resource_type))
+
+    return api_params
+
+
+
 def alias_resource(client, module):
     """
     Adds, updates or deletes lambda function aliases for specified version.
@@ -263,17 +289,19 @@ def lambda_code(client, module):
     :param module: Ansible module reference
     :return dict:
     """
-
     results = dict()
+    api_params = dict()
 
-    code = module.params.get('code')
     state = module.params.get('state')
+    function_name = module.params.get('function_name')
+    if not function_name:
+        module.fail_json(msg='Parameter function_name required for resource type code.')
 
     current_state = None
     last_modified = None
-    # check if function exists
+    # check if function exists and get facts
     try:
-        response = client.get_function_configuration(FunctionName=module.params['function_name'])
+        response = client.get_function_configuration(FunctionName=function_name)
         current_state = 'present'
         last_modified = response.get('LastModified')
         #TODO: need to determine how to retain short-term 'updated' state--will continusouly update until then
@@ -287,32 +315,28 @@ def lambda_code(client, module):
             module.fail_json(msg='Boto3 Client error: {0}'.format(e))
 
     if state == current_state:
-        changed = False
+        changed = False             # nothing to do but exit
     else:
         if state == 'absent':
             # delete function
+            required_params = ('function_name', )
+            api_params.update(get_api_params(required_params, module, 'code', required=True))
             try:
-                results = client.delete_function(
-                    FunctionName=module.params.get('function_name'),
-                )
+                results = client.delete_function(**api_params)
                 changed = True
             except ClientError, e:
                 module.fail_json(msg='Boto3 Client error: {0}'.format(e))
 
         elif state == 'present':
             # create the function
+            required_params = ('function_name', 'code', 'runtime', 'role', 'handler')
+            optional_params = ('memory_size', 'timeout', 'description', 'publish')
+
+            api_params.update(get_api_params(required_params, module, 'code', required=True))
+            api_params.update(get_api_params(optional_params, module, 'code', required=False))
+
             try:
-                results = client.create_function(
-                    FunctionName=module.params.get('function_name'),
-                    Runtime=module.params.get('runtime'),
-                    Role=module.params.get('role'),
-                    Handler=module.params.get('handler'),
-                    Code=module.params.get('code'),
-                    Description=module.params.get('description'),
-                    Timeout=module.params.get('timeout'),
-                    MemorySize=module.params.get('memory_size'),
-                    Publish=module.params.get('publish')
-                )
+                results = client.create_function(**api_params)
                 changed = True
             except ClientError, e:
                 module.fail_json(msg='Boto3 Client error: {0}'.format(e))
@@ -321,15 +345,14 @@ def lambda_code(client, module):
             if current_state == 'absent':
                 module.fail_json(msg='Function {0} does not exist--must create before.'.format(module.params.get('function_name')))
 
+            required_params = ('function_name', 'code')
+            optional_params = ('publish', )
+
+            api_params.update(get_api_params(required_params, module, 'code', required=True))
+            api_params.update(get_api_params(optional_params, module, 'code', required=False))
+
             try:
-                results = client.update_function_configuration(
-                    FunctionName=module.params.get('function_name'),
-                    Role=module.params.get('role'),
-                    Handler=module.params.get('handler'),
-                    Description=module.params.get('description'),
-                    Timeout=module.params.get('timeout'),
-                    MemorySize=module.params.get('memory_size')
-                )
+                results = client.update_function_configuration(**api_params)
                 changed = True
             except ClientError, e:
                 module.fail_json(msg='Boto3 Client error: {0}'.format(e))
