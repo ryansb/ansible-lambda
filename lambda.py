@@ -47,17 +47,6 @@ options:
         constraint applies only to the ARN. If you specify only the function name, it is limited to 64 character 
         in length.
     required: false
-  max_items:
-    description:
-      - Maximum number of items to return for various list requests
-    required: false
-  next_marker:
-    description:
-      - "Some queries such as 'versions' or 'mappings' will return a maximum
-        number of entries - EG 100. If the number of entries exceeds this maximum
-        another request can be sent using the NextMarker entry from the first response
-        to get the next page of results"
-    required: false
   state:
     description:
       - Describes the desired state of the resource and defaults to "present"
@@ -72,7 +61,11 @@ options:
   code:
     description:
       - Dictionary of items which describe where to find the function code to be uploaded to AWS.  Typically, this
-        is a simple file or deployment package bundled in a ZIP archive file.
+        is a simple file or deployment package bundled in a ZIP archive file.  The dictionary keys are as follows:
+      - s3_bucket:          Bucket name
+      - s3_key:             S3 Key name
+      - s3_object_version:  S3 object version if versioning is turned on
+      - zip_file:           Base64-encoded .zip file containing source code
     required: false
   handler:
     description:
@@ -111,7 +104,7 @@ options:
     description:
       - The AWS Lambda assigned ID of the event source mapping.
     required: false
-  alias_name:
+  name:
     description:
       -  Name of the function alias.
     required: false
@@ -123,7 +116,7 @@ options:
       - You can specify this optional query parameter to specify function version or alias name in which case this 
         API will return all permissions associated with the specific ARN. If you don't provide this parameter, the 
         API will return permissions that apply to the unqualified function ARN.
-      - For usage with Policy resources.
+      - * For Policy Resources *
 extends_documentation_fragment:
   - aws
 '''
@@ -163,20 +156,24 @@ except ImportError:
     HAS_BOTO3 = False
 
 
-def pc(identifier):
-    """
-    Changes python identifiers into Pascale Case identifiers.
+# ----------------------------------
+#          Helper functions
+# ----------------------------------
 
-    :param identifier:
+def pc(key):
+    """
+    Changes python key into Pascale case equivalent. For example, 'this_function_name' becomes 'ThisFunctionName'.
+
+    :param key:
     :return:
     """
 
-    return "".join([token.capitalize() for token in identifier.split('_')])
+    return "".join([token.capitalize() for token in key.split('_')])
 
 
 def get_api_params(params, module, resource_type, required=False):
     """
-    Check for presence of parameters, required or optional and fixup parameter case.
+    Check for presence of parameters, required or optional and change parameter case for API.
 
     :param params: AWS API parameters
     :param module: Ansible module reference
@@ -190,13 +187,42 @@ def get_api_params(params, module, resource_type, required=False):
     for param in params:
         value = module.params.get(param)
         if value:
+            if param == 'code':
+                value = check_code_params(module)
+
             api_params[pc(param)] = value
         else:
             if required:
-                module.fail_json(msg='Parameter {0} required for resource type {1}'.format(param, resource_type))
+                module.fail_json(msg='Parameter {0} required for this action on resource type {1}'.format(param, resource_type))
 
     return api_params
 
+
+def check_code_params(module):
+    """
+    Not so much checking as converting key case.  Let the API do most of the checking.
+
+    :param module:
+    :return:
+    """
+
+    code_params = module.params.get('code')
+
+    if not isinstance(code_params, dict):
+        module.fail_json(msg="Parameter 'code' must be a dictionary. Found: {0}".format(code_params))
+
+    api_params = dict()
+
+    for key in ('zip_file', 's3_bucket', 's3_key', 's3_object_version'):
+        if key in code_params:
+            api_params[pc(key)] = code_params[key]
+
+    return api_params
+
+
+# ----------------------------------
+#   Resource management functions
+# ----------------------------------
 
 def alias_resource(client, module):
     """
@@ -213,7 +239,7 @@ def alias_resource(client, module):
     current_state = None
 
     state = module.params.get('state')
-    resource = "{0}::alias".format(module.params.get('name'))
+    resource = 'alias'
 
     required_params = ('function_name', 'name')
     api_params.update(get_api_params(required_params, module, resource, required=True))
@@ -252,7 +278,7 @@ def alias_resource(client, module):
                 results = client.create_alias(**api_params)
                 changed = True
             except ClientError, e:
-                module.fail_json(msg='Unable to create alias {0} for {1}:{2}, error: {3}'.format(name, function_name, version, e))
+                module.fail_json(msg='Error creating {0}: {1}'.format(resource, e))
 
         else:  
             # update the alias if necessary
@@ -283,7 +309,7 @@ def lambda_code(client, module):
     last_modified = None
 
     state = module.params.get('state')
-    resource = "{0}::code".format(module.params.get('function_name'))
+    resource = 'code'
 
     required_params = ('function_name',)
     api_params.update(get_api_params(required_params, module, resource, required=True))
@@ -304,7 +330,7 @@ def lambda_code(client, module):
             current_state = 'absent'
             last_modified = None
         else:
-            module.fail_json(msg='Error retrieving {0}: {1}'.format(resource, e))
+            module.fail_json(msg='Error retrieving function {0}: {1}'.format(resource, e))
 
     if state == current_state:
         # nothing to do but exit
@@ -316,7 +342,7 @@ def lambda_code(client, module):
                 results = client.delete_function(**api_params)
                 changed = True
             except ClientError, e:
-                module.fail_json(msg='Error deleting {0}: {1}'.format(resource, e))
+                module.fail_json(msg='Error deleting function {0}: {1}'.format(resource, e))
 
         elif state == 'present':
             # create the function
@@ -343,10 +369,10 @@ def lambda_code(client, module):
             api_params.update(get_api_params(optional_params, module, resource, required=False))
 
             try:
-                results = client.update_function_configuration(**api_params)
+                results = client.update_function_code(**api_params)
                 changed = True
             except ClientError, e:
-                module.fail_json(msg='Error updating {0}: {1}'.format(resource, e))
+                module.fail_json(msg='Error updating function {0} code: {1}'.format(resource, e))
 
     return dict(changed=changed, results=results)
 
@@ -537,6 +563,10 @@ def version_details(client, module):
     return lambda_facts
 
 
+# ----------------------------------
+#           Main function
+# ----------------------------------
+
 def main():
     """
     Main entry point.
@@ -554,7 +584,7 @@ def main():
         code=dict(type='dict', default=None, required=False),
         timeout=dict(type='int', default=3, required=False),
         memory_size=dict(type='int', default=128, required=False),
-        publish=dict(type='bool', default=True, required=False),
+        publish=dict(type='bool', default=False, required=False),
         name=dict(default=None, required=False),
         function_version=dict(default=None, required=False),
         qualifier=dict(default=None, required=False),
@@ -564,7 +594,11 @@ def main():
         source_account=dict(default=None, required=False),
         source_arn=dict(default=None, required=False),
         description=dict(default=None, required=False),
-        uuid=dict(default=None, required=False)
+        uuid=dict(default=None, required=False),
+        starting_position=dict(default=None, required=False, choices=['TRIM_HORIZON', 'LATEST']),
+        enabled=dict(type='bool', default=True, required=False),
+        batch_size=dict(type='int', default=100, required=False),
+        event_source_arn=dict(default=None, required=False),
         )
     )
 
@@ -610,9 +644,9 @@ def main():
     }
     response = invocations[module.params.get('type')](client, module)
 
-    # remove unnecessary ResponseMetadata from ansible facts before returning results
-    if 'ResponseMetadata' in response:
-        del response['ResponseMetadata']
+    # # remove unnecessary ResponseMetadata from ansible facts before returning results
+    # if 'ResponseMetadata' in response:
+    #     del response['ResponseMetadata']
 
     results = dict(ansible_facts=dict(results=response['results']), changed=response['changed'])
     module.exit_json(**results)
