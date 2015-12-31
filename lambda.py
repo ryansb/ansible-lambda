@@ -175,7 +175,7 @@ def get_api_params(params, module, resource_type, required=False):
     """
     Check for presence of parameters, required or optional and change parameter case for API.
 
-    :param params: AWS API parameters
+    :param params: AWS parameters needed for API
     :param module: Ansible module reference
     :param resource_type:
     :param required:
@@ -282,6 +282,9 @@ def alias_resource(client, module):
 
         else:  
             # update the alias if necessary
+            if current_state == 'absent':
+                module.fail_json(msg='Must create alias before updating it.')
+
             optional_params = ('function_version', 'description')
             api_params.update(get_api_params(optional_params, module, resource, required=False))
 
@@ -379,64 +382,141 @@ def lambda_code(client, module):
 
 def config_details(client, module):
     """
-    Returns configuration details for one or all lambda functions.
+    Updates function configuration details for a lambda functions if it exists.  Resource type 'code' should be used
+    to create or delete lambda functions.
 
     :param client: AWS API client reference (boto3)
     :param module: Ansible module reference
     :return dict:
     """
 
-    lambda_facts = dict()
+    results = dict()
+    changed = False
+    api_params = dict()
+    current_state = None
 
-    function_name = module.params.get('function_name')
-    if function_name:
-        try:
-            lambda_facts.update(client.get_function_configuration(FunctionName=function_name))
-        except ClientError, e:
-            module.fail_json(msg='Unable to get {0} configuration, error: {1}'.format(function_name, e))
+    state = module.params.get('state')
+    resource = 'config'
+
+    required_params = ('function_name',)
+    api_params.update(get_api_params(required_params, module, resource, required=True))
+
+    fetch_api_params = api_params
+    optional_params = ('qualifier',)
+    fetch_api_params.update(get_api_params(optional_params, module, resource, required=False))
+
+    # check if function exists and get facts
+    try:
+        results = client.get_function_configuration(**fetch_api_params)
+        current_state = 'present'
+    except ClientError, e:
+        if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            current_state = 'absent'
+        else:
+            module.fail_json(msg='Error retrieving function {0}: {1}'.format(resource, e))
+
+    if state == current_state:
+        # nothing to do but exit
+        changed = False
     else:
-        params = dict()
-        if module.params.get('max_items'):
-            params['MaxItems'] = module.params.get('max_items')
+        if state == 'absent':
+            # lambda functions cannot be deleted using resource type 'config'.
+            module.fail_json(msg="Cannot delete lambda function using resource type 'config'.")
 
-        if module.params.get('next_marker'):
-            params['Marker'] = module.params.get('next_marker')
+        elif state == 'present':
+            # lambda functions cannot be created using resource type 'config'.
+            module.fail_json(msg="Cannot create lambda function using resource type 'config'.")
+        else:
+            # update the function if it exists
+            if current_state == 'absent':
+                module.fail_json(msg='Must create function before updating its config.')
 
-        try:
-            lambda_facts.update(client.list_functions(**params))
-        except ClientError, e:
-            module.fail_json(msg='Unable to get function list, error: {0}'.format(e))
+            optional_params = ('role', 'handler', 'description', 'timeout', 'memory_size')
+            api_params.update(get_api_params(optional_params, module, resource, required=False))
 
-    return lambda_facts
+            try:
+                results = client.update_function_configuration(**api_params)
+                changed = True
+            except ClientError, e:
+                module.fail_json(msg='Error updating function {0}: {1}'.format(resource, e))
+
+    return dict(changed=changed, results=results)
 
 
 def mapping_resource(client, module):
     """
-    Returns all lambda event source mappings.
+    Adds, updates or deletes lambda event source mappings.
 
     :param client: AWS API client reference (boto3)
     :param module: Ansible module reference
     :return dict:
     """
 
-    lambda_facts = dict()
-    params = dict()
+    results = dict()
+    changed = False
+    api_params = dict()
+    current_state = None
 
-    if module.params.get('function_name'):
-        params['FunctionName'] = module.params.get('function_name')
+    state = module.params.get('state')
+    resource = 'mapping'
 
-    if module.params.get('max_items'):
-        params['MaxItems'] = module.params.get('max_items')
+    required_params = ('uuid',)
+    fetch_api_params = get_api_params(required_params, module, resource, required=True)
 
-    if module.params.get('next_marker'):
-        params['Marker'] = module.params.get('next_marker')
-
+    # check if mapping exists
     try:
-        lambda_facts.update(client.list_event_source_mappings(**params))
+        results = client.get_event_source_mapping(**fetch_api_params)
+        current_state = 'present'
     except ClientError, e:
-        module.fail_json(msg='Unable to get source event mappings, error: {0}'.format(e))
+        if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            current_state = 'absent'
+        else:
+            module.fail_json(msg='Error retrieving {0}: {1}'.format(resource, e))
 
-    return lambda_facts
+    if state == current_state:
+        # nothing to do but exit
+        changed = False
+    else:
+        if state == 'absent':
+            # delete event source mapping
+            try:
+                results = client.delete_event_source_mapping(**fetch_api_params)
+                changed = True
+            except ClientError, e:
+                module.fail_json(msg='Error deleting {0}: {1}'.format(resource, e))
+
+        elif state == 'present':
+            # create event source mapping
+            required_params = ('function_name', 'event_source_arn', 'starting_position')
+            optional_params = ('enabled', 'batch_size')
+
+            api_params.update(get_api_params(required_params, module, resource, required=True))
+            api_params.update(get_api_params(optional_params, module, resource, required=False))
+
+            try:
+                results = client.create_event_source_mapping(**api_params)
+                changed = True
+            except ClientError, e:
+                module.fail_json(msg='Error creating {0}: {1}'.format(resource, e))
+
+        else:
+            # update the event source mapping
+            if current_state == 'absent':
+                module.fail_json(msg='Must create event source mapping before updating it.')
+
+            required_params = ('uuid',)
+            optional_params = ('function_name', 'enabled', 'batch_size')
+
+            api_params.update(get_api_params(required_params, module, resource, required=True))
+            api_params.update(get_api_params(optional_params, module, resource, required=False))
+
+            try:
+                results = client.update_alias(**api_params)
+                changed = True
+            except ClientError, e:
+                module.fail_json(msg='Error updating {0}: {1}'.format(resource, e))
+
+    return dict(changed=changed, results=results)
 
 
 def policy_resource(client, module):
