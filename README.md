@@ -1,4 +1,4 @@
-# ansible-lambda V0.a.1
+# ansible-lambda
 Custom Ansible modules for AWS Lambda support
 
 Will be using Boto3 but not through its CloudFormation functionality.
@@ -10,7 +10,7 @@ Gathers facts related to AWS Lambda functions.
 
 `> ansible localhost -m lambda_facts`
 
-#### lambda (W.I.P.  not yet functional)
+#### lambda
 Add, Update or Delete Lambda related resources.
 
 `> ansible localhost -m lambda -a"state=present function_name=myFunction"`
