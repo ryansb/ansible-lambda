@@ -202,6 +202,9 @@ def mapping_details(client, module):
     if module.params.get('function_name'):
         params['FunctionName'] = module.params.get('function_name')
 
+    if module.params.get('event_source_arn'):
+        params['EventSourceArn'] = module.params.get('event_source_arn')
+
     if module.params.get('max_items'):
         params['MaxItems'] = module.params.get('max_items')
 
@@ -283,6 +286,7 @@ def main():
     argument_spec.update(dict(
             function_name=dict(required=False, default=None),
             query=dict(required=False, choices=['aliases', 'all', 'config', 'mappings', 'policy',  'versions'], default='all'),
+            event_source_arn=dict(required=False, default=None),
             max_items=dict(type='int'),
             next_marker=dict()
         )
