@@ -528,89 +528,70 @@ def policy_resource(client, module):
     :return dict:
     """
 
-    state = module.params.get('state')
-    function_name = module.params.get('function_name')
-    qualifier = module.params.get('qualifier')
-    if not function_name:
-        module.fail_json(msg='Parameter function_name required for resource type policy.')
-
-    current_state = None
+    results = dict()
     changed = False
-    response = dict()
+    api_params = dict()
+    current_state = None
+
+    state = module.params.get('state')
+    resource = 'policy'
+
+    required_params = ('function_name',)
+    api_params.update(get_api_params(required_params, module, resource, required=True))
+
+    optional_params = ('qualifier',)
+    api_params.update(get_api_params(optional_params, module, resource, required=False))
 
     # check if function exists
     try:
         # get_policy returns a JSON string so must convert to dict before reassigning to its key
-        response = client.get_policy(
-            FunctionName=function_name,
-            Qualifier=qualifier
-        )
-        response['Policy'] = json.loads(response.get('Policy', '{}'))
-        current_state = 'present'
+        policy_results = client.get_policy(**api_params)
+        policy_results['Policy'] = json.loads(policy_results.get('Policy', '{}'))
     except ClientError, e:
-        if e.response['Error']['Code'] == 'ResourceNotFoundException':
-            current_state = 'absent'
-        else:
-            module.fail_json(msg='Boto3 Client error: {0}'.format(e))
+        module.fail_json(msg='Error retrieving {0}: {1}'.format(resource, e))
+
+    # now that we have the policy, check if required permission statement is present
+    required_params = ('statement_id',)
+    api_params.update(get_api_params(required_params, module, resource, required=True))
+
+    current_state = 'absent'
+    for statement in policy_results['Policy']['Statement']:
+        if statement['Sid'] == api_params['StatementId']:
+            results = statement
+            current_state = 'present'
+            break
 
     if state == current_state:
+        # nothing to do but exit
         changed = False
     else:
         if state == 'absent':
-
-            statement_id = module.params.get('statement_id')
-            if not statement_id:
-                module.fail_json(msg='Parameter statement_id required to remove resource type policy.')
-
             # remove permission
             try:
-                response = client.remove_permission(
-                    FunctionName=function_name,
-                    StatementId=statement_id,
-                    Qualifier=qualifier
-                )
+                results = client.remove_permission(**api_params)
                 changed = True
             except ClientError, e:
-                module.fail_json(msg='Boto3 Client error: {0}'.format(e))
+                module.fail_json(msg='Error removing policy permission: {0}'.format(e))
 
-        elif state in ('present', 'updated'):
+        elif state == 'present':
 
-            statement_id = module.params.get('statement_id')
-            if not statement_id:
-                module.fail_json(msg='Parameter statement_id required to add permission to policy-type resource.')
+            required_params = ('statement_id', 'action', 'principal', )
+            api_params.update(get_api_params(required_params, module, resource, required=True))
 
-            action = module.params.get('action')
-            if not action:
-                module.fail_json(msg='Parameter action required to add permission to policy-type resource.')
-
-            principal = module.params.get('principal')
-            if not principal:
-                module.fail_json(msg='Parameter principal required to add permission to policy-type resource.')
-
-            qualifier = module.params.get('qualifier')
-            source_arn = module.params.get('source_arn')
-            source_account = module.params.get('qualifier')
+            optional_params = ('source_arn', 'source_account')
+            api_params.update(get_api_params(optional_params, module, resource, required=False))
 
             try:
-                response = client.add_permission(
-                    FunctionName=function_name,
-                    StatementId=statement_id,
-                    Qualifier=qualifier,
-                    Action=action,
-                    Principal=principal,
-                    # SourceArn=source_arn,
-                    # SourceAccount=source_account
-                )
+                results = client.add_permission(**api_params)
                 changed = True
             except ClientError, e:
-                module.fail_json(msg='Unable to add permission to {0} to {1}:{2}, error: {3}'.format(statement_id, function_name, qualifier, e))
+                module.fail_json(msg='Error adding permission to policy: {0}'.format(e))
 
-        else:  # state == 'updated'
-            # update the function if necessary
-            #TODO needs to be completed
-            pass
+        else:
+            # Policy permission cannot be updated
+            module.fail_json(msg="Cannot update policy permission. Use 'present' or 'absent' only.")
 
-    return dict(changed=changed, response=response)
+    return dict(changed=changed, results=results)
 
 
 def version_details(client, module):
