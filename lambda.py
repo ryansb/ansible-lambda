@@ -594,34 +594,62 @@ def policy_resource(client, module):
     return dict(changed=changed, results=results)
 
 
-def version_details(client, module):
+def publish_version(client, module):
     """
-    Returns all lambda function versions.
+    Publishes a version of your function from the current snapshot of HEAD.
 
     :param client: AWS API client reference (boto3)
     :param module: Ansible module reference
     :return dict:
     """
 
-    lambda_facts = dict()
+    results = dict()
+    changed = False
+    api_params = dict()
+    current_state = None
 
-    function_name = module.params.get('function_name')
-    if function_name:
-        params = dict()
-        if module.params.get('max_items'):
-            params['MaxItems'] = module.params.get('max_items')
+    state = module.params.get('state')
+    resource = 'version'
 
-        if module.params.get('next_marker'):
-            params['Marker'] = module.params.get('next_marker')
+    required_params = ('function_name',)
+    api_params.update(get_api_params(required_params, module, resource, required=True))
 
-        try:
-            lambda_facts.update(client.list_versions_by_function(FunctionName=function_name, **params))
-        except ClientError, e:
-            module.fail_json(msg='Unable to get {0} versions, error: {1}'.format(function_name, e))
+    # check if function exists and get facts
+    try:
+        results = client.get_function_configuration(**api_params)
+        current_state = 'present'
+    except ClientError, e:
+        if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            current_state = 'absent'
+        else:
+            module.fail_json(msg='Error retrieving function: {1}'.format(e))
+
+    if state == current_state:
+        # nothing to do but exit
+        changed = False
     else:
-        module.fail_json(msg='Parameter function_name required for query=versions.')
+        if state == 'absent':
+            # lambda functions cannot be deleted using resource type 'config'.
+            module.fail_json(msg="Cannot delete lambda function version using resource type 'version'.")
 
-    return lambda_facts
+        elif state == 'present':
+            # lambda functions cannot be created using resource type 'config'.
+            module.fail_json(msg="Cannot create lambda function using resource type 'config'.")
+        else:
+            # update will publish a new version of the lambda function
+            if current_state == 'absent':
+                module.fail_json(msg='Must create function before publishing a version.')
+
+            optional_params = ('code_sha256', 'description')
+            api_params.update(get_api_params(optional_params, module, resource, required=False))
+
+            try:
+                results = client.publish_version(**api_params)
+                changed = True
+            except ClientError, e:
+                module.fail_json(msg='Error updating function {0}: {1}'.format(resource, e))
+
+    return dict(changed=changed, results=results)
 
 
 # ----------------------------------
@@ -660,6 +688,7 @@ def main():
         enabled=dict(type='bool', default=True, required=False),
         batch_size=dict(type='int', default=100, required=False),
         event_source_arn=dict(default=None, required=False),
+        code_sha256=dict(default=None, required=False)
         )
     )
 
@@ -701,7 +730,7 @@ def main():
         'config': config_details,
         'mapping': mapping_resource,
         'policy': policy_resource,
-        'version': version_details,
+        'version': publish_version,
     }
     response = invocations[module.params.get('type')](client, module)
 
