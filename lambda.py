@@ -20,7 +20,7 @@ module: lambda
 short_description: Creates, updates or deletes AWS Lambda functions, related configs, aliases and mappings.
 description:
     - This module allows the mamangement of AWS Lambda functions and their related resources via the Ansible
-      framework.  It provides CRUD functionality, is idempotent and supports the "Check" state.
+      framework.  It provides CRUD functionality, is idempotent?? and supports the "Check" state??
 version_added: "2.0"
 author: Pierre Jodouin (@pjodouin)
 requirements: [ boto3 ]
@@ -42,8 +42,8 @@ options:
     description:
       - The name you want to assign to the function you are uploading. You can specify an unqualified function 
         name (for example, "Thumbnail") or you can specify Amazon Resource Name (ARN) of the function 
-        (for example, "arn:aws:lambda:us-west-2:account-id:function:ThumbNail"). AWS Lambda also allows you to 
-        specify only the account ID qualifier (for example, "account-id:Thumbnail"). Note that the length 
+        (for example, 'arn:aws:lambda:us-west-2:account-id:function:ThumbNail'). AWS Lambda also allows you to
+        specify only the account ID qualifier (for example, 'account-id:Thumbnail'). Note that the length
         constraint applies only to the ARN. If you specify only the function name, it is limited to 64 character 
         in length.
     required: false
@@ -55,23 +55,17 @@ options:
     choices: ["present", "absent", "updated"]
   runtime:
     description:
-      - Runtime environment of the Lambda function (e.g. nodejs, java, python2.7).   This field is not currently
-        edited and will allow any values since AWS will be adding more languages in the near future.
+      - Runtime environment of the Lambda function.
     required: false
   code:
     description:
       - Dictionary of items which describe where to find the function code to be uploaded to AWS.  Typically, this
-        is a simple file or deployment package bundled in a ZIP archive file.  The dictionary keys are as follows:
-      - s3_bucket:          Bucket name
-      - s3_key:             S3 Key name
-      - s3_object_version:  S3 object version if versioning is turned on
-      - zip_file:           Base64-encoded .zip file containing source code
+        is a simple file or deployment package bundled in a ZIP archive file.  The dictionary keys are s3_bucket,
+        S3 Key name, s3_object_version and zip_file.
     required: false
   handler:
     description:
-      - The function within your code that Lambda calls to begin execution. For Node.js, it is the 
-        module-name.*export* value in your function. For Java, it can be package.class-name::handler or 
-        package.class-name. 
+      - The function within your code that Lambda calls to begin execution.
     required: false
   role:
     description:
@@ -111,12 +105,13 @@ options:
   version:
     description:
       -  Version number of the Lambda function.
+    required: false
   qualifier:
     description:
       - You can specify this optional query parameter to specify function version or alias name in which case this 
         API will return all permissions associated with the specific ARN. If you don't provide this parameter, the 
         API will return permissions that apply to the unqualified function ARN.
-      - * For Policy Resources *
+    required: false
 extends_documentation_fragment:
   - aws
 '''
