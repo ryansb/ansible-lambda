@@ -1,6 +1,11 @@
 import importlib
 from nose.tools import assert_equals
 
+try:
+    import importlib
+except ImportError:
+    pass
+
 # from lambda import DOCUMENTATION, EXAMPLES, RETURN
 lambda_mod = importlib.import_module('lambda')
 
