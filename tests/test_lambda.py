@@ -1,4 +1,3 @@
-import importlib
 from nose.tools import assert_equals
 
 try:
