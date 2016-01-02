@@ -137,6 +137,7 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
+---
 ansible_facts:
     description: lambda function related facts
     type: dict
