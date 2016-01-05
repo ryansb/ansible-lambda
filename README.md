@@ -3,7 +3,8 @@
 
 Custom Ansible modules for AWS Lambda support
 
-Will be using Boto3 but not through its CloudFormation functionality.
+## Requirements
+- Boto3.
 
 ## Modules
 
@@ -17,9 +18,14 @@ Add, Update or Delete Lambda related resources.
 
 `> ansible localhost -m lambda -a"state=present function_name=myFunction"`
 
+#### lambda_invoke
+
+`> ansible localhost -m lambda_invoke -a"function_name=myFunction"
+
+
 ## Installation
 
-Until this custom module is included in the Ansible distro, do the following to install the lambda modules in your Ansible environment:
+Until these custom module are included in the Ansible distro, do the following to install the lambda modules in your Ansible environment:
 
 1. Clone this repository or download the ZIP file.
 
