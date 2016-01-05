@@ -102,7 +102,7 @@ options:
     description:
       -  Name of the function alias.
     required: false
-  version:
+  function_version:
     description:
       -  Version number of the Lambda function.
     required: false
@@ -111,6 +111,58 @@ options:
       - You can specify this optional query parameter to specify function version or alias name in which case this 
         API will return all permissions associated with the specific ARN. If you don't provide this parameter, the 
         API will return permissions that apply to the unqualified function ARN.
+    required: false
+  statement_id:
+    description:
+      -  A unique statement identifier.
+    required: false
+  action:
+    description:
+      -  The AWS Lambda action you want to allow in this permission statement. Each Lambda action is a string starting
+         with "lambda:" followed by the API name
+    required: false
+  principal:
+    description:
+      -  The principal who is getting this permission. It can be Amazon S3 service Principal ("s3.amazonaws.com") if
+         you want Amazon S3 to invoke the function, an AWS account ID if you are granting cross-account permission, or
+         any valid AWS service principal such as "sns.amazonaws.com".
+    required: false
+  source_account:
+    description:
+      -  The AWS account ID (without a hyphen) of the source owner. For example, if the SourceArn identifies a bucket,
+         then this is the bucket owner's account ID. You can use this additional condition to ensure the bucket you
+         specify is owned by a specific account.
+    required: false
+  source_arn:
+    description:
+      -  This is optional; however, when granting Amazon S3 permission to invoke your function, you should specify this
+         field with the bucket Amazon Resource Name (ARN) as its value. This ensures that only events generated from
+         the specified bucket can invoke the function.
+    required: false
+  starting_position:
+    description:
+      -  The position in the stream where AWS Lambda should start reading ('TRIM_HORIZON' or 'LATEST').
+    required: false
+  enabled:
+    description:
+      -  Indicates whether AWS Lambda should begin polling the event source. By default, Enabled is true.
+    required: false
+  batch_size:
+    description:
+      -  The largest number of records that AWS Lambda will retrieve from your event source at the time of invoking
+         your function. Your function receives an event with all the retrieved records. The default is 100 records.
+    required: false
+  event_source_arn:
+    description:
+      -  The Amazon Resource Name (ARN) of the Amazon Kinesis or the Amazon DynamoDB stream that is the event source.
+         Any record added to this stream could cause AWS Lambda to invoke your Lambda function, it depends on the
+         BatchSize . AWS Lambda POSTs the Amazon Kinesis event, containing records, to your Lambda function as JSON.
+    required: false
+  code_sha256:
+    description:
+      -  The SHA256 hash of the deployment package you want to publish. This provides validation on the code you are
+         publishing. If you provide this parameter value must match the SHA256 of the HEAD version for the publication
+         to succeed.
     required: false
 extends_documentation_fragment:
   - aws
@@ -690,7 +742,7 @@ def main():
 
     module = AnsibleModule(
         argument_spec=argument_spec,
-        supports_check_mode=True,
+        supports_check_mode=False,
         mutually_exclusive=[],
         required_together=[]
     )
@@ -708,9 +760,6 @@ def main():
             )
         if len(function_name) > 64:
             module.fail_json(msg='Function name "{0}" exceeds 64 character limit'.format(function_name))
-
-    # validate code
-    code = module.params['code']
 
     try:
         #TODO: don't want to use devel branch so wait until boto3_connect is in main release branch -- use boto3.client until then
