@@ -17,9 +17,13 @@ def test_documentation_yaml():
 
 def test_validate_yaml():
 
-    documentation_yaml = yaml.load(EXAMPLES)
+    documentation_yaml = yaml.load(DOCUMENTATION)
 
-    print yaml.dump(documentation_yaml)
+    example_yaml = yaml.load(EXAMPLES)
+
+    return_yaml = yaml.load(RETURN)
+
+    print documentation_yaml['short_description']
 
 
 
