@@ -19,44 +19,23 @@ DOCUMENTATION = '''
 module: lambda_facts
 short_description: Gathers AWS Lambda function details as Ansible facts 
 description:
-    - Gathers various details related to Lambda functions, including aliases, versions and event source mappings.
+  - Gathers various details related to Lambda functions, including aliases, versions and event source mappings.
 version_added: "2.0"
-author: Pierre Jodouin (@pjodouin)
-requirements: [ boto3 ]
 options:
   query:
     description:
       - Specifies the resource type for which to gather facts.  Leave blank to retrieve all facts.
     required: false
-    choices: [
-            "aliases",
-            "all",
-            "config",
-            "mappings",
-            "policy",
-            "versions",
-            ]
+    choices: [ "aliases", "all", "config", "mappings", "policy", "versions" ]
     default: "all"
   function_name:
     description:
       - The name of the lambda function for which facts are requested.
     required: false
-    default: none
-  max_items:
-    description:
-      - Maximum number of items to return for various fact requests.
-    required: false
-    default: none
-  next_marker:
-    description:
-      - "Some queries such as 'versions' or 'mappings' will return a maximum
-        number of entries - EG 100. If the number of entries exceeds this maximum
-        another request can be sent using the NextMarker entry from the first response
-        to get the next page of results."
-    required: false
-    default: none
-extends_documentation_fragment:
-  - aws
+    default: null
+    aliases: []
+author: Pierre Jodouin (@pjodouin)
+extends_documentation_fragment: aws
 '''
 
 EXAMPLES = '''
@@ -82,17 +61,8 @@ EXAMPLES = '''
   debug: var=Versions
 '''
 
-RETURN = '''
----
-ansible_facts:
-    description: lambda function related facts
-    type: dict
-'''
-
 try:
-    import boto
     import boto3
-    from boto.exception import BotoServerError, NoAuthHandlerFound
     from botocore.exceptions import ClientError
     HAS_BOTO3 = True
 except ImportError:
@@ -120,7 +90,7 @@ def alias_details(client, module):
             params['Marker'] = module.params.get('next_marker')
         try:
             lambda_facts.update(client.list_aliases(FunctionName=function_name, **params))
-        except (BotoServerError, ClientError), e:
+        except ClientError, e:
             module.fail_json(msg='Unable to get {0} aliases, error: {1}'.format(function_name, e))
     else:
         module.fail_json(msg='Parameter function_name required for query=aliases.')
@@ -170,7 +140,7 @@ def config_details(client, module):
     if function_name:
         try:
             lambda_facts.update(client.get_function_configuration(FunctionName=function_name))
-        except (BotoServerError, ClientError), e:
+        except ClientError, e:
             module.fail_json(msg='Unable to get {0} configuration, error: {1}'.format(function_name, e))
     else:
         params = dict()
@@ -182,7 +152,7 @@ def config_details(client, module):
 
         try:
             lambda_facts.update(client.list_functions(**params))
-        except (BotoServerError, ClientError), e:
+        except ClientError, e:
             module.fail_json(msg='Unable to get function list, error: {0}'.format(e))
 
     return lambda_facts
@@ -214,7 +184,7 @@ def mapping_details(client, module):
 
     try:
         lambda_facts.update(client.list_event_source_mappings(**params))
-    except (BotoServerError, ClientError), e:
+    except ClientError, e:
         module.fail_json(msg='Unable to get source event mappings, error: {0}'.format(e))
 
     return lambda_facts
@@ -239,7 +209,7 @@ def policy_details(client, module):
         try:
             # get_policy returns a JSON string so must convert to dict before reassigning to its key
             lambda_facts.update(Policy=json.loads(client.get_policy(FunctionName=function_name)['Policy']))
-        except (BotoServerError, ClientError), e:
+        except ClientError, e:
             module.fail_json(msg='Unable to get {0} policy, error: {1}'.format(function_name, e))
     else:
         module.fail_json(msg='Parameter function_name required for query=policy.')
@@ -269,7 +239,7 @@ def version_details(client, module):
 
         try:
             lambda_facts.update(client.list_versions_by_function(FunctionName=function_name, **params))
-        except (BotoServerError, ClientError), e:
+        except ClientError, e:
             module.fail_json(msg='Unable to get {0} versions, error: {1}'.format(function_name, e))
     else:
         module.fail_json(msg='Parameter function_name required for query=versions.')
@@ -285,11 +255,9 @@ def main():
     """
     argument_spec = ec2_argument_spec()
     argument_spec.update(dict(
-            function_name=dict(required=False, default=None),
+            function_name=dict(required=False, default=None, aliases=['name', 'function']),
             query=dict(required=False, choices=['aliases', 'all', 'config', 'mappings', 'policy',  'versions'], default='all'),
-            event_source_arn=dict(required=False, default=None),
-            max_items=dict(type='int'),
-            next_marker=dict()
+            event_source_arn=dict(required=False, default=None)
         )
     )
 
@@ -319,7 +287,7 @@ def main():
         # region, ec2_url, aws_connect_kwargs = get_aws_connection_info(module)
         # client = boto_conn(module, conn_type='client', resource='lambda', region=region, endpoint=ec2_url, **aws_connect_kwargs)
         client = boto3.client('lambda')
-    except NoAuthHandlerFound, e:
+    except ClientError, e:
         module.fail_json(msg="Can't authorize connection - {0}".format(e))
 
     invocations = {
@@ -332,9 +300,6 @@ def main():
     }
     lambda_facts = invocations[module.params.get('query')](client, module)
 
-    # remove unnecessary ResponseMetadata from ansible facts before returning results
-    if 'ResponseMetadata' in lambda_facts:
-        del lambda_facts['ResponseMetadata']
     results = dict(ansible_facts=lambda_facts, changed=False)
     module.exit_json(**results)
 

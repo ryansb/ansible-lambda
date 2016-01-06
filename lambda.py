@@ -21,9 +21,8 @@ short_description: Creates, updates or deletes AWS Lambda functions, related con
 description:
     - This module allows the mamangement of AWS Lambda functions and their related resources via the Ansible
       framework.  It provides CRUD functionality, is idempotent?? and supports the "Check" state??
-version_added: "2.0"
+version_added: "1.9"
 author: Pierre Jodouin (@pjodouin)
-requirements: [ boto3 ]
 options:
   type:
     description:
@@ -35,7 +34,7 @@ options:
             "config",
             "mapping",
             "policy",
-            "version",
+            "version"
             ]
     default: "all"
   function_name:
@@ -164,8 +163,7 @@ options:
          publishing. If you provide this parameter value must match the SHA256 of the HEAD version for the publication
          to succeed.
     required: false
-extends_documentation_fragment:
-  - aws
+extends_documentation_fragment: aws
 '''
 
 EXAMPLES = '''
@@ -188,17 +186,9 @@ EXAMPLES = '''
   register: my_function_details
 '''
 
-RETURN = '''
----
-ansible_facts:
-    description: lambda function related facts
-    type: dict
-'''
-
 try:
     import boto3
-    # from boto.exception import BotoServerError, NoAuthHandlerFound
-    from botocore.exceptions import *
+    from botocore.exceptions import ClientError
     HAS_BOTO3 = True
 except ImportError:
     HAS_BOTO3 = False
@@ -766,7 +756,7 @@ def main():
         # region, ec2_url, aws_connect_kwargs = get_aws_connection_info(module)
         # client = boto_conn(module, conn_type='client', resource='lambda', region=region, endpoint=ec2_url, **aws_connect_kwargs)
         client = boto3.client('lambda')
-    except Exception, e:
+    except ClientError, e:
         module.fail_json(msg="Can't authorize connection - {0}".format(e))
 
     invocations = {
@@ -778,10 +768,6 @@ def main():
         'version': publish_version,
     }
     response = invocations[module.params.get('type')](client, module)
-
-    # # remove unnecessary ResponseMetadata from ansible facts before returning results
-    # if 'ResponseMetadata' in response:
-    #     del response['ResponseMetadata']
 
     results = dict(ansible_facts=dict(results=response['results']), changed=response['changed'])
     module.exit_json(**results)

@@ -20,9 +20,8 @@ module: lambda_invoke
 short_description: Invokes an AWS Lambda function 
 description:
     - This module has a single purpose of triggering the execution of a specified lambda function. 
-version_added: "2.0"
+version_added: "1.9"
 author: Pierre Jodouin (@pjodouin)
-requirements: [ boto3 ]
 options:
   function_name:
     description:
@@ -51,7 +50,7 @@ options:
     choices: [
         "RequestResponse",
         "Event",
-        "DryRun",
+        "DryRun"
         ]
     default: RequestResponse
   log_type:
@@ -60,7 +59,7 @@ options:
         with value "RequestResponse". In this case, AWS Lambda returns the base64-encoded last 4 KB of log data 
         produced by your Lambda function in the x-amz-log-results header.
     required: false
-    choices: ["Tail",]
+    choices: ["Tail"]
     default: none
   client_context:
     description:
@@ -74,8 +73,7 @@ options:
       - JSON that you want to provide to your Lambda function as input. 
     required: false
     default: none  
-extends_documentation_fragment:
-  - aws
+extends_documentation_fragment: aws
 '''
 
 EXAMPLES = '''
@@ -89,13 +87,6 @@ EXAMPLES = '''
   register: my_function_details
 - name: show Lambda function results
   debug: var=Results
-'''
-
-RETURN = '''
----
-ansible_facts:
-    description: lambda function execution results
-    type: dict
 '''
 
 try:
@@ -226,7 +217,7 @@ def main():
 
     try:
         client = boto3.client('lambda')
-    except NoAuthHandlerFound, e:
+    except ClientError, e:
         module.fail_json(msg="Can't authorize connection - {0}".format(e))
 
     response = invoke_function(client, module)
