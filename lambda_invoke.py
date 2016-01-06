@@ -33,7 +33,7 @@ options:
     required: true
   qualifier:
     description:
-      - You can use this optional paramter to specify a Lambda function version or alias name. If you specify function 
+      - You can use this optional parameter to specify a Lambda function version or alias name. If you specify function
         version, the API uses qualified function ARN to invoke a specific Lambda function. If you specify alias name, 
         the API uses the alias ARN to invoke the Lambda function version to which the alias points. 
         If you don't provide this parameter, then the API uses unqualified function ARN which results in invocation of 
@@ -53,14 +53,14 @@ options:
         "Event",
         "DryRun",
         ]
-    default: 'RequestResponse
+    default: RequestResponse
   log_type:
     description:
       - You can set this optional parameter to "Tail" in the request only if you specify the invocation_type parameter 
         with value "RequestResponse". In this case, AWS Lambda returns the base64-encoded last 4 KB of log data 
         produced by your Lambda function in the x-amz-log-results header.
     required: false
-    choices: ['Tail', none]
+    choices: ["Tail",]
     default: none
   client_context:
     description:
