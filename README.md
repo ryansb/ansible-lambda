@@ -1,5 +1,5 @@
 # ansible-lambda
-####Version 0.1 [![Build Status](https://travis-ci.org/pjodouin/ansible-lambda.svg)](https://travis-ci.org/pjodouin/ansible-lambda)
+####Version 0.2 [![Build Status](https://travis-ci.org/pjodouin/ansible-lambda.svg)](https://travis-ci.org/pjodouin/ansible-lambda)
 
 Custom Ansible modules for AWS Lambda support
 
@@ -19,8 +19,9 @@ Add, Update or Delete Lambda related resources.
 `> ansible localhost -m lambda -a"state=present function_name=myFunction"`
 
 #### lambda_invoke
+Use to invoke a specific Lambda function.
 
-`> ansible localhost -m lambda_invoke -a"function_name=myFunction"
+`> ansible localhost -m lambda_invoke -a"function_name=myFunction"`
 
 
 ## Installation
