@@ -25,7 +25,7 @@ options:
   query:
     description:
       - Specifies the resource type for which to gather facts.  Leave blank to retrieve all facts.
-    required: false
+    required: true
     choices: [ "aliases", "all", "config", "mappings", "policy", "versions" ]
     default: "all"
   function_name:
@@ -33,7 +33,7 @@ options:
       - The name of the lambda function for which facts are requested.
     required: false
     default: null
-    aliases: []
+    aliases: [ "function"]
 author: Pierre Jodouin (@pjodouin)
 extends_documentation_fragment: aws
 '''
@@ -255,7 +255,7 @@ def main():
     """
     argument_spec = ec2_argument_spec()
     argument_spec.update(dict(
-            function_name=dict(required=False, default=None, aliases=['name', 'function']),
+            function_name=dict(required=False, default=None, aliases=['function']),
             query=dict(required=False, choices=['aliases', 'all', 'config', 'mappings', 'policy',  'versions'], default='all'),
             event_source_arn=dict(required=False, default=None)
         )

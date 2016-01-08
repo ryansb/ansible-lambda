@@ -27,16 +27,9 @@ options:
   type:
     description:
       - specifies the resource type on which to take action
-    required: false
-    choices: [
-            "alias",
-            "code",
-            "config",
-            "mapping",
-            "policy",
-            "version"
-            ]
-    default: "all"
+    required: true
+    choices: [ "alias", "code", "config", "mapping", "policy", "version" ]
+    default: "code"
   function_name:
     description:
       - The name you want to assign to the function you are uploading. You can specify an unqualified function 
@@ -46,10 +39,11 @@ options:
         constraint applies only to the ARN. If you specify only the function name, it is limited to 64 character 
         in length.
     required: false
+    aliases: [ "function" ]
   state:
     description:
       - Describes the desired state of the resource and defaults to "present"
-    required: false
+    required: true
     default: "present"
     choices: ["present", "absent", "updated"]
   runtime:
@@ -105,6 +99,7 @@ options:
     description:
       -  Version number of the Lambda function.
     required: false
+    aliases: [ "version" ]
   qualifier:
     description:
       - You can specify this optional query parameter to specify function version or alias name in which case this 
@@ -115,6 +110,7 @@ options:
     description:
       -  A unique statement identifier.
     required: false
+    aliases: [ "sid" ]
   action:
     description:
       -  The AWS Lambda action you want to allow in this permission statement. Each Lambda action is a string starting
@@ -142,6 +138,7 @@ options:
     description:
       -  The position in the stream where AWS Lambda should start reading ('TRIM_HORIZON' or 'LATEST').
     required: false
+    choices: [ "TRIM_HORIZON", "LATEST" ]
   enabled:
     description:
       -  Indicates whether AWS Lambda should begin polling the event source. By default, Enabled is true.
@@ -703,8 +700,8 @@ def main():
     argument_spec = ec2_argument_spec()
     argument_spec.update(dict(
         state=dict(default=None, required=True, choices=['present', 'absent', 'updated']),
-        function_name=dict(required=False, default=None),
-        type=dict(default=None, required=True, choices=['alias', 'code', 'config', 'mapping', 'policy', 'version']),
+        function_name=dict(required=False, default=None, aliases=['function']),
+        type=dict(default='code', required=True, choices=['alias', 'code', 'config', 'mapping', 'policy', 'version']),
         runtime=dict(default=None, required=False),
         role=dict(default=None, required=False),
         handler=dict(default=None, required=False),
@@ -713,9 +710,9 @@ def main():
         memory_size=dict(type='int', default=128, required=False),
         publish=dict(type='bool', default=False, required=False),
         name=dict(default=None, required=False),
-        function_version=dict(default=None, required=False),
+        function_version=dict(default=None, required=False, aliases=['version']),
         qualifier=dict(default=None, required=False),
-        statement_id=dict(default=None, required=False),
+        statement_id=dict(default=None, required=False, aliases=['sid']),
         action=dict(default=None, required=False),
         principal=dict(default=None, required=False),
         source_account=dict(default=None, required=False),
