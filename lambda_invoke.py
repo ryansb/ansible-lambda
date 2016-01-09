@@ -91,7 +91,8 @@ EXAMPLES = '''
 
 try:
     import boto3
-    from botocore.exceptions import ClientError
+    import boto3.session
+    from botocore.exceptions import ClientError, EndpointConnectionError
     HAS_BOTO3 = True
 except ImportError:
     HAS_BOTO3 = False
@@ -169,6 +170,9 @@ def invoke_function(client, module):
         results = client.invoke(**api_params)
     except ClientError, e:
         module.fail_json(msg='Error invoking function {0}: {1}'.format(module.params['function_name'], e))
+    except EndpointConnectionError, e:
+        module.fail_json(msg='Lambda function not found: {0}'.format(e))
+
 
     # Payload is returning non-JSON-serializable data which crashes ansible so ignore it for now
     if 'Payload' in results:
@@ -215,10 +219,26 @@ def main():
         if len(function_name) > 64:
             module.fail_json(msg='Function name "{0}" exceeds 64 character limit'.format(function_name))
 
+    api_params = dict()
+    region = module.params.get('region') 
+    if region:
+        api_params.update(region_name=region)
+
+    profile = module.params.get('profile') 
+    if profile:
+        api_params.update(profile_name=profile)
+
     try:
-        client = boto3.client('lambda')
+        region, ec2_url, aws_connect_kwargs = get_aws_connection_info(module, boto3=True)
+        # client = boto3.client('lambda')
+        # session = botocore.session.get_session()
+        # client = session.create_client('lambda', **api_params)
+        session = boto3.session.Session(region_name=region, ec2_url=ec2_url, **aws_connect_kwargs)
+        client = session.client('lambda')
     except ClientError, e:
         module.fail_json(msg="Can't authorize connection - {0}".format(e))
+    except Exception, e:
+        module.fail_json(msg="Connection Error - {0}".format(e))
 
     response = invoke_function(client, module)
     results = dict(ansible_facts=response, changed=False)
