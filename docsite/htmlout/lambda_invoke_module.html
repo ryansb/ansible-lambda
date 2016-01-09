@@ -14,7 +14,7 @@
   <!-- End Google Tag Manager Data Layer -->
 
   
-  <title>lambda_facts - Gathers AWS Lambda function details as Ansible facts &mdash; Ansible Documentation</title>
+  <title>lambda_invoke - Invokes an AWS Lambda function &mdash; Ansible Documentation</title>
   
 
   
@@ -53,8 +53,8 @@
   
     <link rel="top" title="Ansible Documentation" href="index.html"/>
         <link rel="up" title="Cloud Modules" href="list_of_cloud_modules.html"/>
-        <link rel="next" title="lambda_invoke - Invokes an AWS Lambda function" href="lambda_invoke_module.html"/>
-        <link rel="prev" title="lambda - Creates, updates or deletes AWS Lambda functions, related configs, aliases and mappings." href="lambda_module.html"/> 
+        <link rel="next" title="rds - create, delete, or modify an Amazon rds instance" href="rds_module.html"/>
+        <link rel="prev" title="lambda_facts - Gathers AWS Lambda function details as Ansible facts" href="lambda_facts_module.html"/> 
 
   <script src="//cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
 
@@ -418,15 +418,15 @@
 
           <ul class="wy-breadcrumbs">
   <li><a href="index.html">Docs</a> &raquo;</li>
-  <li><a href="">lambda_facts - Gathers AWS Lambda function details as Ansible facts</a></li>
+  <li><a href="">lambda_invoke - Invokes an AWS Lambda function</a></li>
   
 </ul>
 <hr/>
 
           <div id="page-content">
           
-  <div class="section" id="lambda-facts-gathers-aws-lambda-function-details-as-ansible-facts">
-<span id="lambda-facts"></span><h1>lambda_facts - Gathers AWS Lambda function details as Ansible facts<a class="headerlink" href="#lambda-facts-gathers-aws-lambda-function-details-as-ansible-facts" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="lambda-invoke-invokes-an-aws-lambda-function">
+<span id="lambda-invoke"></span><h1>lambda_invoke - Invokes an AWS Lambda function<a class="headerlink" href="#lambda-invoke-invokes-an-aws-lambda-function" title="Permalink to this headline">¶</a></h1>
 <div class="contents local topic" id="contents">
 <ul class="simple">
 <li><a class="reference internal" href="#synopsis" id="id1">Synopsis</a></li>
@@ -438,9 +438,9 @@
 <div class="section" id="synopsis">
 <h2><a class="toc-backref" href="#id1">Synopsis</a><a class="headerlink" href="#synopsis" title="Permalink to this headline">¶</a></h2>
 <div class="versionadded">
-<p><span class="versionmodified">New in version 2.0.</span></p>
+<p><span class="versionmodified">New in version 1.9.</span></p>
 </div>
-<p>Gathers various details related to Lambda functions, including aliases, versions and event source mappings.</p>
+<p>This module has a single purpose of triggering the execution of a specified lambda function.</p>
 </div>
 <div class="section" id="options">
 <h2><a class="toc-backref" href="#id2">Options</a><a class="headerlink" href="#options" title="Permalink to this headline">¶</a></h2>
@@ -467,6 +467,13 @@
     <td>AWS secret key. If not set then the value of the AWS_SECRET_KEY environment variable is used.</td>
 </tr>
         <tr>
+<td>client_context</td>
+<td>no</td>
+<td>none</td>
+    <td><ul></ul></td>
+    <td>Using client_context you can pass client-specific information to the Lambda function you are invoking. You can then process the client information in your Lambda function as you choose through the context variable. The ClientContext JSON must be base64-encoded.</td>
+</tr>
+        <tr>
 <td>ec2_url</td>
 <td>no</td>
 <td></td>
@@ -475,10 +482,31 @@
 </tr>
         <tr>
 <td>function_name</td>
-<td>no</td>
+<td>yes</td>
 <td></td>
     <td><ul></ul></td>
-    <td>The name of the lambda function for which facts are requested.</td>
+    <td>The Lambda function name. You can specify an unqualified function name (for example, "Thumbnail") or you can specify Amazon Resource Name (ARN) of the function. AWS Lambda also allows you to specify only the account ID qualifier (for example, "account-id:Thumbnail"). Note that the length constraint applies only to the ARN. If you specify only the function name, it is limited to 64 character in length.</td>
+</tr>
+        <tr>
+<td>invocation_type</td>
+<td>yes</td>
+<td>RequestResponse</td>
+    <td><ul><li>RequestResponse</li><li>Event</li><li>DryRun</li></ul></td>
+    <td>By default, the Invoke API assumes "RequestResponse" invocation type. You can optionally request asynchronous execution by specifying "Event" as the invocation type. You can also use this parameter to request AWS Lambda to not execute the function but do some verification, such as if the caller is authorized to invoke the function and if the inputs are valid. You request this by specifying "DryRun" as the invocation_type. This is useful in a cross-account scenario when you want to verify access to a function without running it.</td>
+</tr>
+        <tr>
+<td>log_type</td>
+<td>no</td>
+<td>none</td>
+    <td><ul><li>Tail</li></ul></td>
+    <td>You can set this optional parameter to "Tail" in the request only if you specify the invocation_type parameter with value "RequestResponse". In this case, AWS Lambda returns the base64-encoded last 4 KB of log data produced by your Lambda function in the x-amz-log-results header.</td>
+</tr>
+        <tr>
+<td>payload</td>
+<td>no</td>
+<td>none</td>
+    <td><ul></ul></td>
+    <td>JSON that you want to provide to your Lambda function as input.</td>
 </tr>
         <tr>
 <td>profile</td>
@@ -488,11 +516,11 @@
     <td>uses a boto profile. Only works with boto &gt;= 2.24.0 (added in Ansible 1.6)</td>
 </tr>
         <tr>
-<td>query</td>
-<td>yes</td>
-<td>all</td>
-    <td><ul><li>aliases</li><li>all</li><li>config</li><li>mappings</li><li>policy</li><li>versions</li></ul></td>
-    <td>Specifies the resource type for which to gather facts.  Leave blank to retrieve all facts.</td>
+<td>qualifier</td>
+<td>no</td>
+<td>none</td>
+    <td><ul></ul></td>
+    <td>You can use this optional parameter to specify a Lambda function version or alias name. If you specify function version, the API uses qualified function ARN to invoke a specific Lambda function. If you specify alias name, the API uses the alias ARN to invoke the Lambda function version to which the alias points. If you don't provide this parameter, then the API uses unqualified function ARN which results in invocation of the $LATEST version.</td>
 </tr>
         <tr>
 <td>security_token</td>
@@ -516,25 +544,15 @@
 <div class="section" id="examples">
 <h2><a class="toc-backref" href="#id3">Examples</a><a class="headerlink" href="#examples" title="Permalink to this headline">¶</a></h2>
 <br/><div class="highlight-python"><div class="highlight"><pre>---
-# Simple example of listing all info for a function
-- name: List all for a specific function
-  lambda_facts:
-    query: all
+# Simple example that invokes a lambda function
+- name: execute lambda function
+  lambda_invoke:
     function_name: myFunction
+    invocation_type: RequestResponse
+    log_type: Tail
   register: my_function_details
-# List all versions of a function
-- name: List function versions
-  lambda_facts:
-    query: versions
-    function_name: myFunction
-  register: my_function_versions
-# List all lambda functions
-- name: List all functions
-  lambda_facts:
-    query: versions
-    max_items: 20
-- name: show Lambda facts
-  debug: var=Versions
+- name: show Lambda function results
+  debug: var=Results
 </pre></div>
 </div>
 <div class="admonition note">
@@ -569,10 +587,10 @@ Popular &#8220;extras&#8221; modules may be promoted to core modules over time.<
   
     <div class="rst-footer-buttons">
       
-        <a href="lambda_invoke_module.html" class="btn btn-neutral float-right" title="lambda_invoke - Invokes an AWS Lambda function"/>Next <span class="icon icon-circle-arrow-right"></span></a>
+        <a href="rds_module.html" class="btn btn-neutral float-right" title="rds - create, delete, or modify an Amazon rds instance"/>Next <span class="icon icon-circle-arrow-right"></span></a>
       
       
-        <a href="lambda_module.html" class="btn btn-neutral" title="lambda - Creates, updates or deletes AWS Lambda functions, related configs, aliases and mappings."><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="lambda_facts_module.html" class="btn btn-neutral" title="lambda_facts - Gathers AWS Lambda function details as Ansible facts"><span class="icon icon-circle-arrow-left"></span> Previous</a>
       
     </div>
   
