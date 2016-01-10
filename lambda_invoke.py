@@ -219,22 +219,14 @@ def main():
         if len(function_name) > 64:
             module.fail_json(msg='Function name "{0}" exceeds 64 character limit'.format(function_name))
 
-    api_params = dict()
-    region = module.params.get('region') 
-    if region:
-        api_params.update(region_name=region)
-
-    profile = module.params.get('profile') 
-    if profile:
-        api_params.update(profile_name=profile)
-
     try:
-        region, ec2_url, aws_connect_kwargs = get_aws_connection_info(module, boto3=True)
-        # client = boto3.client('lambda')
-        # session = botocore.session.get_session()
-        # client = session.create_client('lambda', **api_params)
-        session = boto3.session.Session(region_name=region, ec2_url=ec2_url, **aws_connect_kwargs)
-        client = session.client('lambda')
+        region, endpoint, aws_connect_kwargs = get_aws_connection_info(module, boto3=True)
+        aws_connect_kwargs.update(dict(region=region,
+                                       endpoint=endpoint,
+                                       conn_type='client',
+                                       resource='lambda'
+                                       ))
+        client = boto3_conn(module, **aws_connect_kwargs)
     except ClientError, e:
         module.fail_json(msg="Can't authorize connection - {0}".format(e))
     except Exception, e:
