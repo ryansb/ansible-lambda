@@ -20,7 +20,7 @@ module: lambda_invoke
 short_description: Invokes an AWS Lambda function 
 description:
     - This module has a single purpose of triggering the execution of a specified lambda function. 
-version_added: "1.9"
+version_added: "2.0"
 author: Pierre Jodouin (@pjodouin)
 options:
   function_name:

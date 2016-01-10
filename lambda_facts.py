@@ -283,11 +283,14 @@ def main():
             module.fail_json(msg='Function name "{0}" exceeds 64 character limit'.format(function_name))
 
     try:
-        #TODO: don't want to use devel branch so wait until boto3_connect is in main release branch -- use boto3.client until then
-        # region, ec2_url, aws_connect_kwargs = get_aws_connection_info(module)
-        # client = boto_conn(module, conn_type='client', resource='lambda', region=region, endpoint=ec2_url, **aws_connect_kwargs)
-        client = boto3.client('lambda')
-    except ClientError, e:
+        region, endpoint, aws_connect_kwargs = get_aws_connection_info(module, boto3=True)
+        aws_connect_kwargs.update(dict(region=region,
+                                       endpoint=endpoint,
+                                       conn_type='client',
+                                       resource='lambda'
+                                       ))
+        client = boto3_conn(module, **aws_connect_kwargs)
+    except AnsibleAWSError, e:
         module.fail_json(msg="Can't authorize connection - {0}".format(e))
 
     invocations = {
