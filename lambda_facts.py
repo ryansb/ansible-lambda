@@ -307,6 +307,10 @@ def main():
     lambda_facts = invocations[module.params.get('query')](client, module)
 
     results = dict(ansible_facts=lambda_facts, changed=False)
+
+    if module.check_mode:
+        results.update(dict(msg='Check mode set but ignored for fact gathering only.'))
+
     module.exit_json(**results)
 
 
