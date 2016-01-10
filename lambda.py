@@ -27,7 +27,7 @@ options:
   type:
     description:
       - specifies the resource type on which to take action
-    required: true
+    required: false
     choices: [ "alias", "code", "config", "mapping", "policy", "version" ]
     default: "code"
   function_name:
@@ -43,7 +43,7 @@ options:
   state:
     description:
       - Describes the desired state of the resource and defaults to "present"
-    required: true
+    required: false
     default: "present"
     choices: ["present", "absent", "updated"]
   runtime:
@@ -699,9 +699,9 @@ def main():
     """
     argument_spec = ec2_argument_spec()
     argument_spec.update(dict(
-        state=dict(default=None, required=True, choices=['present', 'absent', 'updated']),
+        state=dict(default='present', required=False, choices=['present', 'absent', 'updated']),
         function_name=dict(required=False, default=None, aliases=['function']),
-        type=dict(default='code', required=True, choices=['alias', 'code', 'config', 'mapping', 'policy', 'version']),
+        type=dict(default='code', required=False, choices=['alias', 'code', 'config', 'mapping', 'policy', 'version']),
         runtime=dict(default=None, required=False),
         role=dict(default=None, required=False),
         handler=dict(default=None, required=False),
