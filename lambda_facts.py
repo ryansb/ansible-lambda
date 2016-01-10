@@ -210,7 +210,10 @@ def policy_details(client, module):
             # get_policy returns a JSON string so must convert to dict before reassigning to its key
             lambda_facts.update(Policy=json.loads(client.get_policy(FunctionName=function_name)['Policy']))
         except ClientError, e:
-            module.fail_json(msg='Unable to get {0} policy, error: {1}'.format(function_name, e))
+            if e.response['Error']['Code'] == 'ResourceNotFoundException':
+                lambda_facts.update(Policy=dict())
+            else:
+                module.fail_json(msg='Unable to get {0} policy, error: {1}'.format(function_name, e))
     else:
         module.fail_json(msg='Parameter function_name required for query=policy.')
 
