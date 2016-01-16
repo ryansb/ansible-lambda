@@ -23,10 +23,9 @@ Use to invoke a specific Lambda function.
 
 `> ansible localhost -m lambda_invoke -a"function_name=myFunction"`
 
-#### s3_lambda_event
-Use to add an s3 event notification to lambda.
+#### s3_lambda_event [ work in progress ...]
+To add an s3 event notification to lambda.
 
-`> ansible localhost -m s3_lambda_event -a"function_arn=..."`
 
 
 ## Installation
