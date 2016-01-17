@@ -1,14 +1,16 @@
-# ansible-lambda
-####Version 0.3 [![Build Status](https://travis-ci.org/pjodouin/ansible-lambda.svg)](https://travis-ci.org/pjodouin/ansible-lambda)
+# Ansible Cloud Modules for AWS Lambda
+#### Version 0.3 [![Build Status](https://travis-ci.org/pjodouin/ansible-lambda.svg)](https://travis-ci.org/pjodouin/ansible-lambda)
 
-Custom Ansible modules for AWS Lambda support.  These modules help manage AWS Lambda resources including code, configuration, event source mappings and policy permissions.
-
+These modules help manage AWS Lambda resources including code, configuration, aliases, versions, event source mappings and policy permissions. A specialized s3
+module is also provided to help manage s3 event notifications that trigger Lambda functions.
 ## Requirements
-- Boto3.
+- ansible
+- boto3
+- importlib (only for running tests on < python 2.7)
 
 ## Modules
-
-#### - lambda_facts
+### lambda_facts:
+___
 Gathers facts related to AWS Lambda functions.
 
 ##### Example Command
@@ -32,11 +34,10 @@ Gathers facts related to AWS Lambda functions.
   debug: var=Versions
 ```
 
-#### - lambda
-Add, Update or Delete Lambda related resources.
 
-##### Example Command
-`> ansible localhost -m lambda -a"state=present function_name=myFunction"`
+### lambda:
+___
+Add, Update or Delete Lambda related resources. These include 'alias', 'code', 'config', 'mapping', 'policy' and 'version.'
 
 ##### Example Playbook
 ```yaml
@@ -64,14 +65,16 @@ Add, Update or Delete Lambda related resources.
 
 ```
 
-#### - lambda_invoke
+### lambda_invoke:
+___
 Use to invoke a specific Lambda function.
 
 ##### Example Command
 `> ansible localhost -m lambda_invoke -a"function_name=myFunction"`
 
 
-#### - lambda_s3_event
+### lambda_s3_event:
+___
 Add or delete an s3 event notification that calls a lambda function.
 
 ##### Example Playbook
@@ -95,25 +98,27 @@ Add or delete an s3 event notification that calls a lambda function.
             filter_rules:
              - name: prefix
                value: 'dev/'
-      - id: lambda-package-hello-prod
-        lambda_function_arn: arn:aws:lambda:us-east-1:myAccount:function:myFunction:Prod
+      - id: lambda-package-myFunction-qa
+        lambda_function_arn: arn:aws:lambda:us-east-1:myAccount:function:myFunction:QA
         events: [ 's3:ObjectCreated:*' ]
         filter:
           key:
             filter_rules:
              - name: prefix
-               value: 'prod/'
+               value: 'qa/'
   - name: display stuff
     debug: var=results
 ```
 
 ## Installation
 
-Until these custom module are included in the Ansible distro, do the following to install the lambda modules in your Ansible environment:
+Do the following to install the lambda modules in your Ansible environment:
 
 1. Clone this repository or download the ZIP file.
 
-2. copy the *.py modules to your installation custom module directory (usually /etc/ansible/modules).
+2. Copy the *.py modules to your installation custom module directory (usually /etc/ansible/modules).
+
+3. Make sure boto3 is installed.
 
 
 
