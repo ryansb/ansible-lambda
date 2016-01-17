@@ -23,10 +23,41 @@ Use to invoke a specific Lambda function.
 
 `> ansible localhost -m lambda_invoke -a"function_name=myFunction"`
 
-#### lambda_s3_event [ work in progress ...]
+#### lambda_s3_event
 Add or delete an s3 event notification that calls a lambda function.
 
-
+Example Playbook
+```yaml
+- hosts: localhost
+  gather_facts: no
+  vars:
+    state: present
+    bucket: myBucketName
+  tasks:
+  - name: add s3 event notifications that trigger a lambda function
+    lambda_s3_event:
+      state: "{{ state | default('present') }}"
+      bucket: "{{ bucket }}"
+      lambda_function_configurations:
+      - id: lambda-package-myFunction-dev
+        lambda_function_arn: arn:aws:lambda:us-east-1:myAccount:function:myFunction:Dev
+        events: [ 's3:ObjectCreated:*' ]
+        filter:
+          key:
+            filter_rules:
+             - name: prefix
+               value: 'dev/'
+      - id: lambda-package-hello-prod
+        lambda_function_arn: arn:aws:lambda:us-east-1:myAccount:function:myFunction:Prod
+        events: [ 's3:ObjectCreated:*' ]
+        filter:
+          key:
+            filter_rules:
+             - name: prefix
+               value: 'prod/'
+  - name: display stuff
+    debug: var=results
+```
 
 ## Installation
 
