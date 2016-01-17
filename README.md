@@ -23,8 +23,8 @@ Use to invoke a specific Lambda function.
 
 `> ansible localhost -m lambda_invoke -a"function_name=myFunction"`
 
-#### s3_lambda_event [ work in progress ...]
-To add an s3 event notification to lambda.
+#### lambda_s3_event [ work in progress ...]
+Add or delete an s3 event notification that calls a lambda function.
 
 
 

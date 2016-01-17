@@ -16,7 +16,7 @@
 
 DOCUMENTATION = '''
 ---
-module: s3_lambda_event
+module: lambda_s3_event
 short_description: Creates, updates or deletes s3 notification events for Lambda functions.
 description:
     - This module is used to create or delete s3 event notifications, which trigger Lambda functions.  
@@ -39,18 +39,39 @@ options:
       - List of dictionaries each specifying a Lambda notification configuration.
     required: false
     default: null
-
 '''
-
 
 EXAMPLES = '''
 ---
-# add an s3 event notification to a lambda function
-- name: add event mapping
-  s3_lambda_event:
-    lambda_function_arn: arn:aws:lambda:region:id:function:my_function_name:my_alias
-    events: [ 's3:ObjectCreated:*']
-
+- hosts: localhost
+  gather_facts: no
+  vars:
+    state: present
+    bucket: myBucketName
+  tasks:
+  - name: add s3 event notifications that trigger a lambda function
+    s3_lambda_event:
+      state: "{{ state | default('present') }}"
+      bucket: "{{ bucket }}"
+      lambda_function_configurations:
+      - id: lambda-package-myFunction-dev
+        lambda_function_arn: arn:aws:lambda:us-east-1:myAccount:function:myFunction:Dev
+        events: [ 's3:ObjectCreated:*' ]
+        filter:
+          key:
+            filter_rules:
+             - name: prefix
+               value: 'dev/'
+      - id: lambda-package-hello-prod
+        lambda_function_arn: arn:aws:lambda:us-east-1:myAccount:function:myFunction:Prod
+        events: [ 's3:ObjectCreated:*' ]
+        filter:
+          key:
+            filter_rules:
+             - name: prefix
+               value: 'prod/'
+  - name: display stuff
+    debug: var=results
 '''
 
 try:
