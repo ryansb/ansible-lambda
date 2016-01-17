@@ -28,33 +28,18 @@ options:
       -  Bucket name
     required: true
     default: null
-  lambda_function_arn:
-    description:
-      - Lambda cloud function ARN that Amazon S3 can invoke when it detects events of the specified type. 
-    required: false
-    aliases: [ "function" ]
   state:
     description:
       - Describes the desired state of the resource and defaults to "present"
     required: false
     default: "present"
     choices: ["present", "absent", "updated"]
-  events:
+  lambda_function_configurations:
     description:
-      - List of bucket events for which to send notifications.
+      - List of dictionaries each specifying a Lambda notification configuration.
     required: false
     default: null
-  id:
-    description:
-      -  Optional unique identifier for configurations in a notification configuration. If you don't 
-         provide one, Amazon S3 will assign an ID. 
-    required: false
-    default: null 
-  filter:
-    description:
-      - Container for object key name filtering rules. For information about key name filtering, go to 
-        Configuring Event Notifications in the Amazon Simple Storage Service Developer Guide.
-    required: false
+
 '''
 
 
@@ -113,16 +98,18 @@ def get_api_params(params, module, resource_type, required=False):
             api_params[pc(param)] = value
         else:
             if required:
-                module.fail_json(msg='Parameter {0} required for this action on resource type {1}'.format(param, resource_type))
+                module.fail_json(
+                    msg='Parameter {0} required for this action on resource type {1}'.format(param, resource_type)
+                )
 
     return api_params
 
 
 def check_sub_params(value):
     """
-    Not so much checking as converting key case.  Let the API do most of the checking.
+    Not so much checking as converting key case.  (Let the API do most of the checking.)
 
-    :param value:
+    :param value: object
     :return:
     """
 
@@ -167,7 +154,7 @@ def lambda_event_notification(client, module):
     # check if event notifications exist
     try:
         results = client.get_bucket_notification_configuration(**api_params)
-        if 'NotificationConfiguration' in results:
+        if 'LambdaFunctionConfigurations' in results:
             current_state = 'present'
     except ClientError, e:
         if e.response['Error']['Code'] == 'ResourceNotFoundException':
@@ -175,7 +162,7 @@ def lambda_event_notification(client, module):
         else:
             module.fail_json(msg='Error retrieving {0}: {1}'.format(resource, e))
 
-    if state == current_state:
+    if state == current_state:   # or module.check_mode:
         # nothing to do but exit
         changed = False
     else:
@@ -238,7 +225,7 @@ def main():
     argument_spec = ec2_argument_spec()
     argument_spec.update(dict(
         state=dict(default='present', required=False, choices=['present', 'absent', 'updated']),
-        bucket=dict(default=None,required=True),
+        bucket=dict(default=None, required=True),
         lambda_function_configurations=dict(type='list', default=None, required=False),
          )
     )
