@@ -6,7 +6,7 @@
     bucket: ivcs-package
   tasks:
   - name: add s3 event notifications that trigger a lambda function
-    s3_lambda_event:
+    lambda_s3_event:
       state: "{{ state | default('present') }}"
       bucket: "{{ bucket }}"
       lambda_function_configurations:

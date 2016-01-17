@@ -50,7 +50,7 @@ EXAMPLES = '''
     bucket: myBucketName
   tasks:
   - name: add s3 event notifications that trigger a lambda function
-    s3_lambda_event:
+    lambda_s3_event:
       state: "{{ state | default('present') }}"
       bucket: "{{ bucket }}"
       lambda_function_configurations:
@@ -165,6 +165,7 @@ def lambda_event_notification(client, module):
     changed = False
     api_params = dict()
     current_state = None
+    lambda_function_configurations = dict()
 
     state = module.params.get('state')
     resource = 's3_lambda_event'
@@ -175,31 +176,38 @@ def lambda_event_notification(client, module):
     # check if event notifications exist
     try:
         results = client.get_bucket_notification_configuration(**api_params)
+        response_metadata = results.pop('ResponseMetadata')
         if 'LambdaFunctionConfigurations' in results:
+            lambda_function_configurations = results.pop('LambdaFunctionConfigurations')
             current_state = 'present'
+        else:
+            current_state = 'absent'
+
     except ClientError, e:
         if e.response['Error']['Code'] == 'ResourceNotFoundException':
             current_state = 'absent'
         else:
             module.fail_json(msg='Error retrieving {0}: {1}'.format(resource, e))
 
-    if state == current_state:   # or module.check_mode:
+    if state == current_state or module.check_mode:
         # nothing to do but exit
         changed = False
     else:
         if state == 'absent':
-            # delete the event notifications
+            # delete the lambda event notifications
 
-            api_params.update(NotificationConfiguration=dict())
+            api_params.update(NotificationConfiguration=results)
 
             try:
                 results = client.put_bucket_notification_configuration(**api_params)
                 changed = True
             except ClientError, e:
-                module.fail_json(msg='Error deleting {0}: {1}'.format(resource, e))
+                module.fail_json(msg='Error removing {0}: {1}'.format(resource, e))
 
         elif state == 'present':
             # create event notifications
+
+            api_params.update(results)
 
             required_params = ('lambda_function_configurations',)
             api_params.update(get_api_params(required_params, module, resource, required=True))
@@ -217,6 +225,8 @@ def lambda_event_notification(client, module):
             # update the event notifications
             if current_state == 'absent':
                 module.fail_json(msg='Must create event notification before updating it.')
+
+            api_params.update(results)
 
             required_params = ('lambda_function_configurations',)
             api_params.update(get_api_params(required_params, module, resource, required=True))
