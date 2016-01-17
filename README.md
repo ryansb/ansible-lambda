@@ -1,5 +1,5 @@
 # ansible-lambda
-####Version 0.2 [![Build Status](https://travis-ci.org/pjodouin/ansible-lambda.svg)](https://travis-ci.org/pjodouin/ansible-lambda)
+####Version 0.3 [![Build Status](https://travis-ci.org/pjodouin/ansible-lambda.svg)](https://travis-ci.org/pjodouin/ansible-lambda)
 
 Custom Ansible modules for AWS Lambda support.  These modules help manage AWS Lambda resources including code, configuration, event source mappings and policy permissions.
 
