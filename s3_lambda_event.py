@@ -31,7 +31,7 @@ options:
   lambda_function_arn:
     description:
       - Lambda cloud function ARN that Amazon S3 can invoke when it detects events of the specified type. 
-    required: true
+    required: false
     aliases: [ "function" ]
   state:
     description:
@@ -42,7 +42,8 @@ options:
   events:
     description:
       - List of bucket events for which to send notifications.
-    required: true
+    required: false
+    default: null
   id:
     description:
       -  Optional unique identifier for configurations in a notification configuration. If you don't 
@@ -106,8 +107,8 @@ def get_api_params(params, module, resource_type, required=False):
     for param in params:
         value = module.params.get(param)
         if value:
-            if param == 'filter':
-                value = check_filter_params(module)
+            if not isinstance(value, basestring):
+                value = check_sub_params(value)
 
             api_params[pc(param)] = value
         else:
@@ -117,26 +118,26 @@ def get_api_params(params, module, resource_type, required=False):
     return api_params
 
 
-def check_filter_params(module):
+def check_sub_params(value):
     """
     Not so much checking as converting key case.  Let the API do most of the checking.
 
-    :param module:
+    :param value:
     :return:
     """
 
-    code_params = module.params.get('filter')
+    if isinstance(value, dict):
+        sub_params = dict()
+        for key in value.keys():
+            sub_params[pc(key)] = check_sub_params(value[key])
+    elif isinstance(value, list):
+        sub_params = list()
+        for item in value:
+            sub_params.append(check_sub_params(item))
+    else:
+        sub_params = value
 
-    if not isinstance(code_params, dict):
-        module.fail_json(msg="Parameter 'filter' must be a dictionary. Found: {0}".format(code_params))
-
-    api_params = dict()
-
-    for key in ('zip_file', 's3_bucket', 's3_key', 's3_object_version'):
-        if key in code_params:
-            api_params[pc(key)] = code_params[key]
-
-    return api_params
+    return sub_params
 
 
 # ----------------------------------
@@ -166,7 +167,8 @@ def lambda_event_notification(client, module):
     # check if event notifications exist
     try:
         results = client.get_bucket_notification_configuration(**api_params)
-        current_state = 'present'
+        if 'NotificationConfiguration' in results:
+            current_state = 'present'
     except ClientError, e:
         if e.response['Error']['Code'] == 'ResourceNotFoundException':
             current_state = 'absent'
@@ -181,6 +183,7 @@ def lambda_event_notification(client, module):
             # delete the event notifications
 
             api_params.update(NotificationConfiguration=dict())
+
             try:
                 results = client.put_bucket_notification_configuration(**api_params)
                 changed = True
@@ -190,11 +193,11 @@ def lambda_event_notification(client, module):
         elif state == 'present':
             # create event notifications
 
-            required_params = ('lambda_function_arn', 'events')
+            required_params = ('lambda_function_configurations',)
             api_params.update(get_api_params(required_params, module, resource, required=True))
 
-            optional_params = ('filter', 'id')
-            api_params.update(get_api_params(optional_params, module, resource, required=False))
+            bucket = api_params.pop('Bucket')
+            api_params = dict(NotificationConfiguration=api_params, Bucket=bucket)
 
             try:
                 results = client.put_bucket_notification_configuration(**api_params)
@@ -207,6 +210,12 @@ def lambda_event_notification(client, module):
             if current_state == 'absent':
                 module.fail_json(msg='Must create event notification before updating it.')
 
+            required_params = ('lambda_function_configurations',)
+            api_params.update(get_api_params(required_params, module, resource, required=True))
+
+            bucket = api_params.pop('Bucket')
+            api_params = dict(NotificationConfiguration=api_params, Bucket=bucket)
+
             try:
                 results = client.put_bucket_notification_configuration(**api_params)
                 changed = True
@@ -214,7 +223,6 @@ def lambda_event_notification(client, module):
                 module.fail_json(msg='Error updating {0}: {1}'.format(resource, e))
 
     return dict(changed=changed, results=results)
-
 
 
 # ----------------------------------
@@ -231,11 +239,8 @@ def main():
     argument_spec.update(dict(
         state=dict(default='present', required=False, choices=['present', 'absent', 'updated']),
         bucket=dict(default=None,required=True),
-        lambda_function_arn=dict(required=False, default=None, aliases=['function']),        
-        events=dict(type='list', default=None, required=False),
-        id=dict(default=None, required=False),
-        filter=dict(type='dict', default=None, required=False),
-        )
+        lambda_function_configurations=dict(type='list', default=None, required=False),
+         )
     )
 
     module = AnsibleModule(
@@ -248,16 +253,6 @@ def main():
     # validate dependencies
     if not HAS_BOTO3:
         module.fail_json(msg='boto3 is required for this module.')
-
-    # validate function_name if present
-    function_name = module.params['function_name']
-    if function_name:
-        if not re.search('^[\w\-:]+$', function_name):
-            module.fail_json(
-                    msg='Function name {0} is invalid. Names must contain valid ARN characters only.'.format(function_name)
-            )
-        if len(function_name) > 64:
-            module.fail_json(msg='Function name "{0}" exceeds 64 character limit'.format(function_name))
 
     try:
         region, endpoint, aws_connect_kwargs = get_aws_connection_info(module, boto3=True)
