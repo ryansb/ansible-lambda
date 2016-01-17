@@ -189,7 +189,7 @@ def lambda_event_notification(client, module):
         else:
             module.fail_json(msg='Error retrieving {0}: {1}'.format(resource, e))
 
-    if state == current_state or module.check_mode:
+    if state == current_state:    # or module.check_mode:
         # nothing to do but exit
         changed = False
     else:
@@ -263,7 +263,7 @@ def main():
 
     module = AnsibleModule(
         argument_spec=argument_spec,
-        supports_check_mode=True,
+        supports_check_mode=False,
         mutually_exclusive=[],
         required_together=[]
     )
