@@ -1,0 +1,17 @@
+---
+- hosts: localhost
+  gather_facts: no
+  vars:
+    state: present
+    update_version: '4'
+  tasks:
+  - name: update alias function version 
+    lambda:
+      state: "{{ state | default('present') }}"
+      type: alias
+      function_name: hello
+      name: QA
+      function_version: "{{ update_version }}"
+      description: "updated to version {{ update_version }}"
+  - name: display stuff
+    debug: var=results

@@ -1,0 +1,22 @@
+---
+- hosts: localhost
+  gather_facts: no
+  vars:
+    state: present
+  tasks:
+  - name: create a function
+    lambda:
+      state: "{{ state | default('present') }}"
+      type: config
+      function_name: ansible-tester
+      runtime: python2.7
+      code:
+        s3_bucket: ivcs-package
+        s3_key: lambda/lambda.zip
+      timeout: 3
+      handler: lambda.handler
+      role: arn:aws:iam::123456789012:role/someAPI2LambdaExecRole
+      description: just another lambda
+      publish: False
+  - name: display stuff
+    debug: var=results

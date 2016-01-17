@@ -1,0 +1,16 @@
+---
+- hosts: localhost
+  gather_facts: no
+  vars:
+    state: present
+  tasks:
+  - name: work with lambda policy
+    lambda:
+      state: "{{ state | default('present') }}"
+      type: policy
+      function_name: ansible-tester
+      statement_id: 123-i-am-unique-456
+      action: lambda:CreateFunction
+      principal: s3.amazonaws.com
+  - name: display stuff
+    debug: var=results

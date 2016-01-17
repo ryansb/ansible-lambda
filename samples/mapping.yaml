@@ -1,0 +1,15 @@
+---
+- hosts: localhost
+  gather_facts: no
+  vars:
+    state: present
+  tasks:
+  - name: create a function
+    lambda:
+      state: "{{ state | default('present') }}"
+      type: mappings
+      function_name: hello
+      description: just another lambda
+      publish: False
+  - name: display stuff
+    debug: var=results
