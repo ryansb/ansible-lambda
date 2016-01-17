@@ -5,13 +5,26 @@
     state: present
     bucket: ivcs-package
   tasks:
-  - name: add/deleted s3 event notifications to/from a lambda function
+  - name: add s3 event notifications that trigger a lambda function
     s3_lambda_event:
       state: "{{ state | default('present') }}"
       bucket: "{{ bucket }}"
       lambda_function_configurations:
+      - id: lambda-package-hello-dev
+        lambda_function_arn: arn:aws:lambda:us-east-1:469333712854:function:hello:Dev
+        events: [ 's3:ObjectCreated:*' ]
+        filter:
+          key:
+            filter_rules:
+             - name: prefix
+               value: 'dev/'
       - id: lambda-package-hello-prod
         lambda_function_arn: arn:aws:lambda:us-east-1:469333712854:function:hello:Prod
         events: [ 's3:ObjectCreated:*' ]
+        filter:
+          key:
+            filter_rules:
+             - name: prefix
+               value: 'prod/'
   - name: display stuff
     debug: var=results
