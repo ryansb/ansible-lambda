@@ -756,7 +756,7 @@ def main():
                                        resource='lambda'
                                        ))
         client = boto3_conn(module, **aws_connect_kwargs)
-    except AnsibleAWSError, e:
+    except ClientError, e:
         module.fail_json(msg="Can't authorize connection - {0}".format(e))
 
     invocations = {
