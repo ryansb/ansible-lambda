@@ -2,7 +2,7 @@ from nose.tools import assert_equals
 import yaml
 
 
-from lambda_invoke import DOCUMENTATION, EXAMPLES
+from modules.lambda_invoke import DOCUMENTATION, EXAMPLES
 
 
 def test_documentation_yaml():

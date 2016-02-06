@@ -8,7 +8,7 @@ except ImportError:
     # then it must be built-in (>=2.7)
     pass
 
-lambda_mod = importlib.import_module('lambda')
+lambda_mod = importlib.import_module('modules/lambda')
 
 
 def test_documentation_yaml():
