@@ -228,7 +228,7 @@ def main():
         client = boto3_conn(module, **aws_connect_kwargs)
     except ClientError, e:
         module.fail_json(msg="Can't authorize connection - {0}".format(e))
-    except Exception, e:
+    except EndpointConnectionError, e:
         module.fail_json(msg="Connection Error - {0}".format(e))
 
     response = invoke_function(client, module)

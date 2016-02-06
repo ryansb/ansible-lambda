@@ -1,10 +1,10 @@
-# Ansible Cloud Modules for AWS Lambda
+# Ansible Cloud Modules & Plugins for AWS Lambda
 #### Version 0.3 [![Build Status](https://travis-ci.org/pjodouin/ansible-lambda.svg)](https://travis-ci.org/pjodouin/ansible-lambda)
 
 These modules help manage AWS Lambda resources including code, configuration, aliases, versions, event source mappings and policy permissions. A specialized s3
-module is also provided to help manage s3 event notifications that trigger Lambda functions.
+module is also provided to help manage s3 event notifications that trigger Lambda functions.  A lookup plugin is also included which allows looking up values via a Lambda function.
 ## Requirements
-- ansible
+- ansible 2.0
 - boto3
 - importlib (only for running tests on < python 2.7)
 
@@ -110,15 +110,36 @@ Add or delete an s3 event notification that calls a lambda function.
     debug: var=results
 ```
 
+## Plugins
+### lambda (lookup):
+___
+Returns value(s) by invoking a lambda function.
+
+##### Example Playbook
+```yaml
+# Simple example of using a value returned by a lambda function invocation
+- hosts: localhost
+  gather_facts: no
+  vars:
+    state: absent
+    lambda_output: "{{ lookup('lambda', 'myFunction') }}"
+  tasks:
+  - name: Test lookup plugin
+    debug: var=lambda_output
+
+```
+
 ## Installation
 
 Do the following to install the lambda modules in your Ansible environment:
 
 1. Clone this repository or download the ZIP file.
 
-2. Copy the *.py modules to your installation custom module directory (usually /etc/ansible/modules).
+2. Copy the *.py files from the modules folder to your installation custom module folder (usually /etc/ansible/modules).
 
-3. Make sure boto3 is installed.
+3. Copy the *.py files from the plugins folder to your installation custom plugin folder.
+
+4. Make sure boto3 is installed.
 
 
 
