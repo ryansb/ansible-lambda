@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# This module is a candidate for Ansible module extras.
+# (c) 2016, Pierre Jodouin <pjodouin@virtualcomputing.solutions>
 #
 # Ansible is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@ short_description: Creates, updates or deletes AWS Lambda functions, related con
 description:
     - This module allows the mamangement of AWS Lambda functions and their related resources via the Ansible
       framework.  It provides CRUD functionality, is idempotent?? and supports the "Check" state??
-version_added: "1.9"
+version_added: "2.0"
 author: Pierre Jodouin (@pjodouin)
 options:
   type:
