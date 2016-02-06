@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# This module is a candidate for Ansible module extras.
+# (c) 2016, Pierre Jodouin <pjodouin(at)virtualcomputing.solutions
 #
 # Ansible is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -173,10 +173,9 @@ def invoke_function(client, module):
     except EndpointConnectionError, e:
         module.fail_json(msg='Lambda function not found: {0}'.format(e))
 
-
-    # Payload is returning non-JSON-serializable data which crashes ansible so ignore it for now
+    # The returned Payload is a botocore StreamingBody object. Read all content and convert to JSON.
     if 'Payload' in results:
-        del results['Payload']
+        results['Payload'] = json.loads(results['Payload'].read())
 
     return results
 
