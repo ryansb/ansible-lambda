@@ -741,7 +741,7 @@ def main():
 
     # validate dependencies
     if not HAS_BOTO3:
-        module.fail_json(msg='boto3 is required for this module and can coexist with boto.')
+        module.fail_json(msg='Both boto3 & boto are required for this module.')
 
     # validate function_name if present
     function_name = module.params['function_name']
@@ -772,6 +772,7 @@ def main():
         'policy': policy_resource,
         'version': publish_version,
     }
+
     response = invocations[module.params.get('type')](client, module)
 
     results = dict(ansible_facts=dict(results=response['results']), changed=response['changed'])
