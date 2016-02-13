@@ -4,8 +4,8 @@
 These modules help manage AWS Lambda resources including code, configuration, aliases, versions, event source mappings and policy permissions. A specialized s3
 module is also provided to help manage s3 event notifications that trigger Lambda functions.  A lookup plugin is also included which allows looking up values via a Lambda function.
 ## Requirements
-- ansible 2.0
-- boto3
+- ansible >= 2.0
+- boto3 >= 1.2.3
 - importlib (only for running tests on < python 2.7)
 
 ## Modules
@@ -59,7 +59,6 @@ Add, Update or Delete Lambda related resources. These include 'alias', 'code', '
       handler: lambda.handler
       role: arn:aws:iam::myAccount:role/someAPI2LambdaExecRole
       description: Another lambda function
- #    only available if using latest boto3 devel branch
       vpc_config:
         subnet_ids:
         - subnet-77d3085a

@@ -15,14 +15,14 @@
         s3_key: lambda/lambda.zip
       timeout: 3
       handler: lambda.handler
-      role: arn:aws:iam::myAccount:role/API2LambdaExecRole
+      role: arn:aws:iam::469333712854:role/API2LambdaExecRole
       description: VPC endpoint lambda function
-#      vpc_config:
-#        subnet_ids:
-#        - subnet-77d3085c
-#        - subnet-b4910cc3
-#        security_group_ids:
-#        - sg-cc2b9ca8
+      vpc_config:
+        subnet_ids:
+        - subnet-77d3085c
+        - subnet-b4910cc3
+        security_group_ids:
+        - sg-cc2b9ca8
       publish: False
   - name: display stuff
     debug: var=results
