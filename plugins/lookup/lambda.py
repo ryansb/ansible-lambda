@@ -26,7 +26,6 @@ from ansible.plugins.lookup import LookupBase
 
 try:
     import boto3
-    import boto3.session
     from botocore.exceptions import ClientError, EndpointConnectionError
     HAS_BOTO3 = True
 except ImportError:
