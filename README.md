@@ -59,6 +59,13 @@ Add, Update or Delete Lambda related resources. These include 'alias', 'code', '
       handler: lambda.handler
       role: arn:aws:iam::myAccount:role/someAPI2LambdaExecRole
       description: Another lambda function
+ #    only available if using latest boto3 devel branch
+      vpc_config:
+        subnet_ids:
+        - subnet-77d3085a
+        - subnet-b4910cc4
+        security_group_ids:
+        - sg-cc2b9ca4
       publish: False
   - name: display stuff
     debug: var=results

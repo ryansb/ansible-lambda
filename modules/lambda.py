@@ -160,7 +160,12 @@ options:
          publishing. If you provide this parameter value must match the SHA256 of the HEAD version for the publication
          to succeed.
     required: false
-extends_documentation_fragment: aws
+  vpc_config:
+    description:
+      -  If your Lambda function accesses resources in a VPC, you provide this parameter identifying the list of
+         security group IDs and subnet IDs. These must belong to the same VPC. You must provide at least one security
+         group and one subnet ID.
+    required: false
 '''
 
 EXAMPLES = '''
@@ -185,6 +190,7 @@ EXAMPLES = '''
 
 try:
     import boto3
+    import boto                                         # seems to be needed for ansible.module_utils
     from botocore.exceptions import ClientError
     HAS_BOTO3 = True
 except ImportError:
@@ -222,8 +228,8 @@ def get_api_params(params, module, resource_type, required=False):
     for param in params:
         value = module.params.get(param)
         if value:
-            if param == 'code':
-                value = check_code_params(module)
+            if param in ('code', 'vpc_config'):
+                value = check_sub_params(module, value)
 
             api_params[pc(param)] = value
         else:
@@ -233,24 +239,22 @@ def get_api_params(params, module, resource_type, required=False):
     return api_params
 
 
-def check_code_params(module):
+def check_sub_params(module, parameter):
     """
     Not so much checking as converting key case.  Let the API do most of the checking.
 
     :param module:
+    :param parameter
     :return:
     """
 
-    code_params = module.params.get('code')
-
-    if not isinstance(code_params, dict):
-        module.fail_json(msg="Parameter 'code' must be a dictionary. Found: {0}".format(code_params))
+    if not isinstance(parameter, dict):
+        module.fail_json(msg="Sub-parameters must be a dictionary. Found: {0}".format(parameter))
 
     api_params = dict()
 
-    for key in ('zip_file', 's3_bucket', 's3_key', 's3_object_version'):
-        if key in code_params:
-            api_params[pc(key)] = code_params[key]
+    for key in parameter:
+        api_params[pc(key)] = parameter[key]
 
     return api_params
 
@@ -385,7 +389,7 @@ def lambda_code(client, module):
         elif state == 'present':
             # create the function
             required_params = ('code', 'runtime', 'role', 'handler')
-            optional_params = ('memory_size', 'timeout', 'description', 'publish')
+            optional_params = ('memory_size', 'timeout', 'description', 'publish', 'vpc_config')
 
             api_params.update(get_api_params(required_params, module, resource, required=True))
             api_params.update(get_api_params(optional_params, module, resource, required=False))
@@ -466,7 +470,7 @@ def config_details(client, module):
             if current_state == 'absent':
                 module.fail_json(msg='Must create function before updating its config.')
 
-            optional_params = ('role', 'handler', 'description', 'timeout', 'memory_size')
+            optional_params = ('role', 'handler', 'description', 'timeout', 'memory_size', 'vpc_config')
             api_params.update(get_api_params(optional_params, module, resource, required=False))
 
             try:
@@ -706,6 +710,7 @@ def main():
         role=dict(default=None, required=False),
         handler=dict(default=None, required=False),
         code=dict(type='dict', default=None, required=False),
+        vpc_config=dict(type='dict', default=None, required=False),
         timeout=dict(type='int', default=3, required=False),
         memory_size=dict(type='int', default=128, required=False),
         publish=dict(type='bool', default=False, required=False),
