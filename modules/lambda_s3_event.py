@@ -76,6 +76,7 @@ EXAMPLES = '''
 
 try:
     import boto3
+    import boto                                         # seems to be needed for ansible.module_utils
     from botocore.exceptions import ClientError
     HAS_BOTO3 = True
 except ImportError:

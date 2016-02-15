@@ -91,7 +91,7 @@ EXAMPLES = '''
 
 try:
     import boto3
-    import boto3.session
+    import boto                                         # seems to be needed for ansible.module_utils
     from botocore.exceptions import ClientError, EndpointConnectionError
     HAS_BOTO3 = True
 except ImportError:
