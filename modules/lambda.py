@@ -70,9 +70,9 @@ options:
       - The function execution time at which Lambda should terminate the function. Because the execution time has cost 
         implications, we recommend you set this value based on your expected execution time. The default is 3 seconds.
     required: false
-  memory:
+  memory_size:
     description:
-      - The amount of memory, in MB, your Lambda function is given. Lambda uses this memory size to infer the amount of 
+      - The amount of memory_size, in MB, your Lambda function is given. Lambda uses this memory size to infer the amount of 
         CPU and memory allocated to your function. Your function use-case determines your CPU and memory requirements. 
         For example, a database operation might need less memory compared to an image processing function. The default 
         value is 128 MB. The value must be a multiple of 64 MB.
