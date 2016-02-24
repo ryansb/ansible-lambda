@@ -28,7 +28,7 @@ options:
     description:
       - specifies the resource type on which to take action
     required: false
-    choices: [ "alias", "code", "config", "mapping", "policy", "version" ]
+    choices: [ "alias", "code", "mapping", "policy", "version" ]
     default: "code"
   function_name:
     description:
@@ -45,10 +45,10 @@ options:
       - Describes the desired state of the resource and defaults to "present"
     required: false
     default: "present"
-    choices: ["present", "absent", "updated"]
+    choices: ["present", "absent"]
   runtime:
     description:
-      - Runtime environment of the Lambda function.
+      - Runtime environment of the Lambda function. Cannot be changed after creating the function.
     required: false
   code:
     description:
@@ -200,7 +200,7 @@ import os.path
 try:
     import boto3
     import boto                                         # seems to be needed for ansible.module_utils
-    from botocore.exceptions import ClientError
+    from botocore.exceptions import ClientError, ParamValidationError, MissingParametersError
     from boto3.s3.transfer import S3Transfer
     HAS_BOTO3 = True
 except ImportError:
@@ -450,15 +450,18 @@ def lambda_code(module):
         else:
             module.fail_json(msg='Error retrieving function {0}: {1}'.format(resource, e))
 
+    facts = results
     if state == 'present':
         if current_state == 'present':
+
             # check if the code has changed
-            s3_hash = results.get(pc('code_sha256'))
+            s3_hash = facts.get(pc('code_sha256'))
             local_hash = get_local_package_hash(module)
-            # module.fail_json(msg='Hash not equal {0}: {1}'.format(s3_hash, local_hash))
+
             if s3_hash != local_hash:
                 # code has changed so upload to s3
-                upload_to_s3(module)
+                if not module.check_mode:
+                    upload_to_s3(module)
 
                 required_params = ('code', )
                 optional_params = ('publish', )
@@ -471,128 +474,59 @@ def lambda_code(module):
                 api_params.update(get_api_params(optional_params, module, resource, required=False))
 
                 try:
-                    results = client.update_function_code(**api_params)
+                    if not module.check_mode:
+                        results = client.update_function_code(**api_params)
                     changed = True
                 except ClientError, e:
                     module.fail_json(msg='Error updating function {0} code: {1}'.format(resource, e))
 
-        else:
-            # upload code to s3
-            # add code/config
-            changed = True
+            # check if config has changed
+            config_changed = False
+            optional_params = ('role', 'handler', 'description', 'timeout', 'memory_size', 'vpc_config')
+            for param in optional_params:
+                if module.params.get(param, None):
+                    if module.params[param] != facts.get(pc(param)):
+                        config_changed = True
+                        break
+
+            if config_changed:
+                required_params = ('function_name', )
+                api_params = get_api_params(required_params, module, 'config', required=True)
+                api_params.update(get_api_params(optional_params, module, 'config', required=False))
+
+                try:
+                    if not module.check_mode:
+                        results = client.update_function_configuration(**api_params)
+                    changed = True
+                except (ClientError, ParamValidationError, MissingParametersError), e:
+                    module.fail_json(msg='Error updating function config: {0}'.format(e))
+
+        else:  # create function
+            if not module.check_mode:
+                upload_to_s3(module)
+
+            required_params = ('code', 'runtime', 'role', 'handler')
+            optional_params = ('memory_size', 'timeout', 'description', 'publish', 'vpc_config')
+
+            api_params.update(get_api_params(required_params, module, resource, required=True))
+            api_params.update(get_api_params(optional_params, module, resource, required=False))
+
+            try:
+                if not module.check_mode:
+                    results = client.create_function(**api_params)
+                changed = True
+            except ClientError, e:
+                module.fail_json(msg='Error creating {0}: {1}'.format(resource, e))
 
     else:  # state = 'absent'
         if current_state == 'present':
             # delete the function
-            changed = True
-
-
-    # if state == current_state:
-    #     # nothing to do but exit
-    #
-    #     changed = False
-    # else:
-    #     if state == 'absent':
-    #         # delete function
-    #         try:
-    #             results = client.delete_function(**api_params)
-    #             changed = True
-    #         except ClientError, e:
-    #             module.fail_json(msg='Error deleting function {0}: {1}'.format(resource, e))
-    #
-    #     elif state == 'present':
-    #         # create the function
-    #         required_params = ('code', 'runtime', 'role', 'handler')
-    #         optional_params = ('memory_size', 'timeout', 'description', 'publish', 'vpc_config', 'local_path')
-    #
-    #         api_params.update(get_api_params(required_params, module, resource, required=True))
-    #         api_params.update(get_api_params(optional_params, module, resource, required=False))
-    #
-    #         try:
-    #             results = client.create_function(**api_params)
-    #             changed = True
-    #         except ClientError, e:
-    #             module.fail_json(msg='Error creating {0}: {1}'.format(resource, e))
-    #     else:
-    #         # update the function if it exists
-    #         if current_state == 'absent':
-    #             module.fail_json(msg='Function {0} does not exist--must create before.'.format(module.params.get('function_name')))
-    #
-    #         required_params = ('code', )
-    #         optional_params = ('publish', )
-    #
-    #         api_params.update(get_api_params(required_params, module, resource, required=True))
-    #         api_params.update(get_api_params(optional_params, module, resource, required=False))
-    #
-    #         try:
-    #             results = client.update_function_code(**api_params)
-    #             changed = True
-    #         except ClientError, e:
-    #             module.fail_json(msg='Error updating function {0} code: {1}'.format(resource, e))
-
-    return dict(changed=changed, results=results)
-
-
-def config_details(module):
-    """
-    Updates function configuration details for a lambda functions if it exists.  Resource type 'code' should be used
-    to create or delete lambda functions.
-
-    :param client: AWS API client reference (boto3)
-    :param module: Ansible module reference
-    :return dict:
-    """
-
-    client = aws_client(module)
-    results = dict()
-    changed = False
-    api_params = dict()
-    current_state = None
-
-    state = module.params.get('state')
-    resource = 'config'
-
-    required_params = ('function_name',)
-    api_params.update(get_api_params(required_params, module, resource, required=True))
-
-    fetch_api_params = api_params
-    optional_params = ('qualifier',)
-    fetch_api_params.update(get_api_params(optional_params, module, resource, required=False))
-
-    # check if function exists and get facts
-    try:
-        results = client.get_function_configuration(**fetch_api_params)
-        current_state = 'present'
-    except ClientError, e:
-        if e.response['Error']['Code'] == 'ResourceNotFoundException':
-            current_state = 'absent'
-        else:
-            module.fail_json(msg='Error retrieving function {0}: {1}'.format(resource, e))
-
-    if state == current_state:
-        # nothing to do but exit
-        changed = False
-    else:
-        if state == 'absent':
-            # lambda functions cannot be deleted using resource type 'config'.
-            module.fail_json(msg="Cannot delete lambda function using resource type 'config'.")
-
-        elif state == 'present':
-            # lambda functions cannot be created using resource type 'config'.
-            module.fail_json(msg="Cannot create lambda function using resource type 'config'.")
-        else:
-            # update the function if it exists
-            if current_state == 'absent':
-                module.fail_json(msg='Must create function before updating its config.')
-
-            optional_params = ('role', 'handler', 'description', 'timeout', 'memory_size', 'vpc_config')
-            api_params.update(get_api_params(optional_params, module, resource, required=False))
-
             try:
-                results = client.update_function_configuration(**api_params)
+                if not module.check_mode:
+                    results = client.delete_function(**api_params)
                 changed = True
             except ClientError, e:
-                module.fail_json(msg='Error updating function {0}: {1}'.format(resource, e))
+                module.fail_json(msg='Error deleting function {0}: {1}'.format(resource, e))
 
     return dict(changed=changed, results=results)
 
@@ -853,7 +787,7 @@ def main():
 
     module = AnsibleModule(
         argument_spec=argument_spec,
-        supports_check_mode=False,
+        supports_check_mode=True,
         mutually_exclusive=[],
         required_together=[]
     )
@@ -875,7 +809,7 @@ def main():
     invocations = {
         'alias': alias_resource,
         'code': lambda_code,
-        'config': config_details,
+        'config': lambda_code,
         'mapping': mapping_resource,
         'policy': policy_resource,
         'version': publish_version,
