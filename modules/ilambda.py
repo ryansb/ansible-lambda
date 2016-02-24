@@ -20,7 +20,7 @@ module: lambda
 short_description: Creates, updates or deletes AWS Lambda functions, related configs, aliases and mappings.
 description:
     - This module allows the mamangement of AWS Lambda functions and their related resources via the Ansible
-      framework.  It provides CRUD functionality, is idempotent?? and supports the "Check" state??
+      framework.  It is idempotent and supports "Check" mode.
 version_added: "2.0"
 author: Pierre Jodouin (@pjodouin)
 options:
