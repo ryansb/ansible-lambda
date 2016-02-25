@@ -586,19 +586,22 @@ def policy_resource(client, module):
         # get_policy returns a JSON string so must convert to dict before reassigning to its key
         policy_results = client.get_policy(**api_params)
         policy_results['Policy'] = json.loads(policy_results.get('Policy', '{}'))
+
+        # now that we have the policy, check if required permission statement is present
+        required_params = ('statement_id',)
+        api_params.update(get_api_params(required_params, module, resource, required=True))
+
+        for statement in policy_results['Policy']['Statement']:
+            if statement['Sid'] == api_params['StatementId']:
+                results = statement
+                current_state = 'present'
+                break
+
     except ClientError, e:
-        module.fail_json(msg='Error retrieving {0}: {1}'.format(resource, e))
-
-    # now that we have the policy, check if required permission statement is present
-    required_params = ('statement_id',)
-    api_params.update(get_api_params(required_params, module, resource, required=True))
-
-    current_state = 'absent'
-    for statement in policy_results['Policy']['Statement']:
-        if statement['Sid'] == api_params['StatementId']:
-            results = statement
-            current_state = 'present'
-            break
+        if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            current_state = 'absent'
+        else:
+            module.fail_json(msg='Error retrieving {0}: {1}'.format(resource, e))
 
     if state == current_state:
         # nothing to do but exit
