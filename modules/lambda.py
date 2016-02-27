@@ -19,8 +19,8 @@ DOCUMENTATION = '''
 module: lambda
 short_description: Creates, updates or deletes AWS Lambda functions, related configs, aliases and mappings.
 description:
-    - This module allows the management of AWS Lambda functions and their related resources via the Ansible
-      framework.  It provides CRUD functionality.
+    - This module allows the mamangement of AWS Lambda functions and their related resources via the Ansible
+      framework.  It is idempotent and supports "Check" mode.
 version_added: "2.0"
 author: Pierre Jodouin (@pjodouin)
 options:
@@ -28,7 +28,7 @@ options:
     description:
       - specifies the resource type on which to take action
     required: false
-    choices: [ "alias", "code", "config", "mapping", "policy", "version" ]
+    choices: [ "alias", "code", "mapping", "policy", "version" ]
     default: "code"
   function_name:
     description:
@@ -45,16 +45,20 @@ options:
       - Describes the desired state of the resource and defaults to "present"
     required: false
     default: "present"
-    choices: ["present", "absent", "updated"]
+    choices: ["present", "absent"]
   runtime:
     description:
-      - Runtime environment of the Lambda function.
+      - Runtime environment of the Lambda function. Cannot be changed after creating the function.
     required: false
   code:
     description:
       - Dictionary of items which describe where to find the function code to be uploaded to AWS.  Typically, this
         is a simple file or deployment package bundled in a ZIP archive file.  The dictionary keys are s3_bucket,
         S3 Key name, s3_object_version and zip_file.
+    required: false
+  local_path:
+    description:
+      - Complete local file path of the deployment package bundled in a ZIP archive.
     required: false
   handler:
     description:
@@ -70,9 +74,9 @@ options:
       - The function execution time at which Lambda should terminate the function. Because the execution time has cost 
         implications, we recommend you set this value based on your expected execution time. The default is 3 seconds.
     required: false
-  memory_size:
+  memory:
     description:
-      - The amount of memory_size, in MB, your Lambda function is given. Lambda uses this memory size to infer the amount of 
+      - The amount of memory, in MB, your Lambda function is given. Lambda uses this memory size to infer the amount of 
         CPU and memory allocated to your function. Your function use-case determines your CPU and memory requirements. 
         For example, a database operation might need less memory compared to an image processing function. The default 
         value is 128 MB. The value must be a multiple of 64 MB.
@@ -180,6 +184,7 @@ EXAMPLES = '''
     code:
       S3Bucket: lambda-function-packages
       S3Key: system1/lambda_deployment.zip
+    local_path: /var/projects/projectName/lambda_deployment.zip
     timeout: 3
     handler: lambda.handler
     role: arn:aws:iam::999999999999:role/API2LambdaExecRole
@@ -188,10 +193,16 @@ EXAMPLES = '''
   register: my_function_details
 '''
 
+import hashlib
+import base64
+import os
+import sys
+
 try:
     import boto3
     import boto                                         # seems to be needed for ansible.module_utils
-    from botocore.exceptions import ClientError
+    from botocore.exceptions import ClientError, ParamValidationError, MissingParametersError
+    from boto3.s3.transfer import S3Transfer
     HAS_BOTO3 = True
 except ImportError:
     HAS_BOTO3 = False
@@ -200,6 +211,30 @@ except ImportError:
 # ----------------------------------
 #          Helper functions
 # ----------------------------------
+
+def aws_client(module, resource='lambda'):
+    """
+    Returns a boto3 client object for the requested resource type.
+
+    :param module:
+    :param resource:
+    :return:
+    """
+
+    try:
+        region, endpoint, aws_connect_kwargs = get_aws_connection_info(module, boto3=True)
+        aws_connect_kwargs.update(dict(region=region,
+                                       endpoint=endpoint,
+                                       conn_type='client',
+                                       resource=resource
+                                       ))
+        client = boto3_conn(module, **aws_connect_kwargs)
+
+    except ClientError, e:
+        module.fail_json(msg="Can't authorize connection - {0}".format(e))
+
+    return client
+
 
 def pc(key):
     """
@@ -259,11 +294,57 @@ def check_sub_params(module, parameter):
     return api_params
 
 
+def upload_to_s3(module):
+    """
+    Upload local deployment package to s3.
+
+    :param module:
+    :return:
+    """
+
+    client = aws_client(module, resource='s3')
+    s3 = S3Transfer(client)
+
+    local_path = module.params['code']['local_path']
+    s3_bucket = module.params['code']['s3_bucket']
+    s3_key = module.params['code']['s3_key']
+
+    try:
+        s3.upload_file(local_path, s3_bucket, s3_key)
+    except Exception, e:
+        module.fail_json(msg='Error uploading package to s3: {0}'.format(e))
+
+    return
+
+
+def get_local_package_hash(module):
+    """
+    Returns the base64 encoded sha256 hash value for the deployment package at local_path.
+
+    :param module:
+    :return:
+    """
+
+    local_path = module.params['code']['local_path']
+
+    if not os.path.isfile(local_path):
+        module.fail_json(msg='Invalid local file path for deployment package: {0}'.format(local_path))
+
+    block_size = os.statvfs(local_path).f_bsize
+    hash_lib = hashlib.sha256()
+
+    with open(local_path, 'rb') as zip_file:
+        for data_chunk in iter(lambda: zip_file.read(block_size), b''):
+            hash_lib.update(data_chunk)
+
+    return base64.b64encode(hash_lib.digest())
+
+
 # ----------------------------------
 #   Resource management functions
 # ----------------------------------
 
-def alias_resource(client, module):
+def alias_resource(module):
     """
     Adds, updates or deletes lambda function aliases for specified version.
 
@@ -272,6 +353,7 @@ def alias_resource(client, module):
     :return dict:
     """
 
+    client = aws_client(module)
     results = dict()
     changed = False
     api_params = dict()
@@ -336,7 +418,7 @@ def alias_resource(client, module):
     return dict(changed=changed, results=results)
 
 
-def lambda_code(client, module):
+def lambda_function(module):
     """
     Adds, updates or deletes lambda function code.
 
@@ -344,50 +426,87 @@ def lambda_code(client, module):
     :param module: Ansible module reference
     :return dict:
     """
+    client = aws_client(module)
     results = dict()
     changed = False
     api_params = dict()
     current_state = None
-    last_modified = None
 
     state = module.params.get('state')
     resource = 'code'
 
-    required_params = ('function_name',)
+    required_params = ('function_name', 'local_path')
     api_params.update(get_api_params(required_params, module, resource, required=True))
+    api_params.pop(pc('local_path'))
 
     optional_params = ('qualifier',)
     api_params.update(get_api_params(optional_params, module, resource, required=False))
 
-    # check if function exists and get facts
+    # check if function exists and get facts, including sha256 hash
     try:
         results = client.get_function_configuration(**api_params)
         current_state = 'present'
-        last_modified = results.get('LastModified')
-        #TODO: need to determine how to retain short-term 'updated' state--will continusouly update until then
-        #     if last_modified:
-        #         current_state = 'updated'
     except ClientError, e:
         if e.response['Error']['Code'] == 'ResourceNotFoundException':
             current_state = 'absent'
-            last_modified = None
         else:
             module.fail_json(msg='Error retrieving function {0}: {1}'.format(resource, e))
 
-    if state == current_state:
-        # nothing to do but exit
-        changed = False             
-    else:
-        if state == 'absent':
-            # delete function
-            try:
-                results = client.delete_function(**api_params)
-                changed = True
-            except ClientError, e:
-                module.fail_json(msg='Error deleting function {0}: {1}'.format(resource, e))
+    facts = results
+    if state == 'present':
+        if current_state == 'present':
 
-        elif state == 'present':
-            # create the function
+            # check if the code has changed
+            s3_hash = facts.get(pc('code_sha256'))
+            local_hash = get_local_package_hash(module)
+
+            if s3_hash != local_hash:
+                # code has changed so upload to s3
+                if not module.check_mode:
+                    upload_to_s3(module)
+
+                required_params = ('code', )
+                optional_params = ('publish', )
+
+                temp_params = get_api_params(required_params, module, resource, required=True)
+                code_params = temp_params.pop('Code')
+                api_params.update(temp_params)
+                api_params.update(code_params)
+
+                api_params.update(get_api_params(optional_params, module, resource, required=False))
+
+                try:
+                    if not module.check_mode:
+                        results = client.update_function_code(**api_params)
+                    changed = True
+                except ClientError, e:
+                    module.fail_json(msg='Error updating function {0} code: {1}'.format(resource, e))
+
+            # check if config has changed
+            config_changed = False
+            optional_params = ('role', 'handler', 'description', 'timeout', 'memory_size', 'vpc_config')
+            for param in optional_params:
+                if module.params.get(param, None):
+                    if module.params[param] != facts.get(pc(param)):
+                        config_changed = True
+                        break
+
+            if config_changed:
+                required_params = ('function_name', )
+                api_params = get_api_params(required_params, module, 'config', required=True)
+                api_params.update(get_api_params(optional_params, module, 'config', required=False))
+
+                try:
+                    if not module.check_mode:
+                        results = client.update_function_configuration(**api_params)
+                    changed = True
+                except (ClientError, ParamValidationError, MissingParametersError), e:
+                    module.fail_json(msg='Error updating function config: {0}'.format(e))
+
+        else:  # create function
+            if not module.check_mode:
+                upload_to_s3(module)
+
             required_params = ('code', 'runtime', 'role', 'handler')
             optional_params = ('memory_size', 'timeout', 'description', 'publish', 'vpc_config')
 
@@ -395,94 +514,36 @@ def lambda_code(client, module):
             api_params.update(get_api_params(optional_params, module, resource, required=False))
 
             try:
-                results = client.create_function(**api_params)
+                if not module.check_mode:
+                    results = client.create_function(**api_params)
                 changed = True
             except ClientError, e:
                 module.fail_json(msg='Error creating {0}: {1}'.format(resource, e))
-        else:  
-            # update the function if it exists
-            if current_state == 'absent':
-                module.fail_json(msg='Function {0} does not exist--must create before.'.format(module.params.get('function_name')))
 
-            required_params = ('code', )
-            optional_params = ('publish', )
-
-            api_params.update(get_api_params(required_params, module, resource, required=True))
-            api_params.update(get_api_params(optional_params, module, resource, required=False))
-
+    else:  # state = 'absent'
+        if current_state == 'present':
+            # delete the function
             try:
-                results = client.update_function_code(**api_params)
+                if not module.check_mode:
+                    results = client.delete_function(**api_params)
                 changed = True
             except ClientError, e:
-                module.fail_json(msg='Error updating function {0} code: {1}'.format(resource, e))
+                module.fail_json(msg='Error deleting function {0}: {1}'.format(resource, e))
 
     return dict(changed=changed, results=results)
 
 
-def config_details(client, module):
-    """
-    Updates function configuration details for a lambda functions if it exists.  Resource type 'code' should be used
-    to create or delete lambda functions.
-
-    :param client: AWS API client reference (boto3)
-    :param module: Ansible module reference
-    :return dict:
+def vpc_config(module):
     """
 
-    results = dict()
-    changed = False
-    api_params = dict()
-    current_state = None
+    :param module:
+    :return:
+    """
 
-    state = module.params.get('state')
-    resource = 'config'
-
-    required_params = ('function_name',)
-    api_params.update(get_api_params(required_params, module, resource, required=True))
-
-    fetch_api_params = api_params
-    optional_params = ('qualifier',)
-    fetch_api_params.update(get_api_params(optional_params, module, resource, required=False))
-
-    # check if function exists and get facts
-    try:
-        results = client.get_function_configuration(**fetch_api_params)
-        current_state = 'present'
-    except ClientError, e:
-        if e.response['Error']['Code'] == 'ResourceNotFoundException':
-            current_state = 'absent'
-        else:
-            module.fail_json(msg='Error retrieving function {0}: {1}'.format(resource, e))
-
-    if state == current_state:
-        # nothing to do but exit
-        changed = False
-    else:
-        if state == 'absent':
-            # lambda functions cannot be deleted using resource type 'config'.
-            module.fail_json(msg="Cannot delete lambda function using resource type 'config'.")
-
-        elif state == 'present':
-            # lambda functions cannot be created using resource type 'config'.
-            module.fail_json(msg="Cannot create lambda function using resource type 'config'.")
-        else:
-            # update the function if it exists
-            if current_state == 'absent':
-                module.fail_json(msg='Must create function before updating its config.')
-
-            optional_params = ('role', 'handler', 'description', 'timeout', 'memory_size', 'vpc_config')
-            api_params.update(get_api_params(optional_params, module, resource, required=False))
-
-            try:
-                results = client.update_function_configuration(**api_params)
-                changed = True
-            except ClientError, e:
-                module.fail_json(msg='Error updating function {0}: {1}'.format(resource, e))
-
-    return dict(changed=changed, results=results)
+    pass
 
 
-def mapping_resource(client, module):
+def event_mappings(module):
     """
     Adds, updates or deletes lambda event source mappings.
 
@@ -491,6 +552,7 @@ def mapping_resource(client, module):
     :return dict:
     """
 
+    client = aws_client(module)
     results = dict()
     changed = False
     api_params = dict()
@@ -558,7 +620,7 @@ def mapping_resource(client, module):
     return dict(changed=changed, results=results)
 
 
-def policy_resource(client, module):
+def policy_resource(module):
     """
     Returns policy attached to a lambda function.
 
@@ -567,6 +629,7 @@ def policy_resource(client, module):
     :return dict:
     """
 
+    client = aws_client(module)
     results = dict()
     changed = False
     api_params = dict()
@@ -636,7 +699,7 @@ def policy_resource(client, module):
     return dict(changed=changed, results=results)
 
 
-def publish_version(client, module):
+def publish_version(module):
     """
     Publishes a version of your function from the current snapshot of HEAD.
 
@@ -645,6 +708,7 @@ def publish_version(client, module):
     :return dict:
     """
 
+    client = aws_client(module)
     results = dict()
     changed = False
     api_params = dict()
@@ -706,38 +770,18 @@ def main():
     """
     argument_spec = ec2_argument_spec()
     argument_spec.update(dict(
-        state=dict(default='present', required=False, choices=['present', 'absent', 'updated']),
-        function_name=dict(required=False, default=None, aliases=['function']),
-        type=dict(default='code', required=False, choices=['alias', 'code', 'config', 'mapping', 'policy', 'version']),
-        runtime=dict(default=None, required=False),
-        role=dict(default=None, required=False),
-        handler=dict(default=None, required=False),
-        code=dict(type='dict', default=None, required=False),
-        vpc_config=dict(type='dict', default=None, required=False),
-        timeout=dict(type='int', default=3, required=False),
-        memory_size=dict(type='int', default=128, required=False),
-        publish=dict(type='bool', default=False, required=False),
-        name=dict(default=None, required=False),
-        function_version=dict(default=None, required=False, aliases=['version']),
-        qualifier=dict(default=None, required=False),
-        statement_id=dict(default=None, required=False, aliases=['sid']),
-        action=dict(default=None, required=False),
-        principal=dict(default=None, required=False),
-        source_account=dict(default=None, required=False),
-        source_arn=dict(default=None, required=False),
-        description=dict(default=None, required=False),
-        uuid=dict(default=None, required=False),
-        starting_position=dict(default=None, required=False, choices=['TRIM_HORIZON', 'LATEST']),
-        enabled=dict(type='bool', default=True, required=False),
-        batch_size=dict(type='int', default=100, required=False),
-        event_source_arn=dict(default=None, required=False),
-        code_sha256=dict(default=None, required=False)
+        state=dict(required=False, default='present', choices=['present', 'absent']),
+        name=dict(required=True, default=None, aliases=['function_name']),
+        config=dict(required=True, default=None, aliases=['configuration']),
+        code=dict(type='dict', required=True, default=None, aliases=['function_code']),
+        event_mappings=dict(type='list', required=False, default=None),
+        vpc=dict(type='dict', required=False, default=None),
         )
     )
 
     module = AnsibleModule(
         argument_spec=argument_spec,
-        supports_check_mode=False,
+        supports_check_mode=True,
         mutually_exclusive=[],
         required_together=[]
     )
@@ -746,39 +790,32 @@ def main():
     if not HAS_BOTO3:
         module.fail_json(msg='Both boto3 & boto are required for this module.')
 
-    # validate function_name if present
+    # validate function_name
     function_name = module.params['function_name']
-    if function_name:
-        if not re.search('^[\w\-:]+$', function_name):
-            module.fail_json(
-                    msg='Function name {0} is invalid. Names must contain only alphanumeric characters and hyphens.'.format(function_name)
-            )
-        if len(function_name) > 64:
-            module.fail_json(msg='Function name "{0}" exceeds 64 character limit'.format(function_name))
+    if not re.search('^[\w\-:]+$', function_name):
+        module.fail_json(
+                msg='Function name {0} is invalid. Names must contain only alphanumeric characters and hyphens.'.format(function_name)
+        )
+    if len(function_name) > 64:
+        module.fail_json(msg='Function name "{0}" exceeds 64 character limit'.format(function_name))
 
-    try:
-        region, endpoint, aws_connect_kwargs = get_aws_connection_info(module, boto3=True)
-        aws_connect_kwargs.update(dict(region=region,
-                                       endpoint=endpoint,
-                                       conn_type='client',
-                                       resource='lambda'
-                                       ))
-        client = boto3_conn(module, **aws_connect_kwargs)
-    except ClientError, e:
-        module.fail_json(msg="Can't authorize connection - {0}".format(e))
+    response = lambda_function(module)
+    results = response['results']
+    changed = response['changed']
 
-    invocations = {
-        'alias': alias_resource,
-        'code': lambda_code,
-        'config': config_details,
-        'mapping': mapping_resource,
-        'policy': policy_resource,
-        'version': publish_version,
-    }
+    # process event mappings if defined
+    if module.params.get('event_mappings'):
+        response = event_mappings(module)
+        results.update(response['results'])
+        changed = changed or response['changed']
 
-    response = invocations[module.params.get('type')](client, module)
+    # process vpc config if defined
+    if module.params.get('vpc'):
+        response = vpc_config(module)
+        results.update(response['results'])
+        changed = changed or response['changed']
 
-    results = dict(ansible_facts=dict(results=response['results']), changed=response['changed'])
+    results = dict(ansible_facts=dict(results=results), changed=changed)
     module.exit_json(**results)
 
 

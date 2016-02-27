@@ -1,0 +1,66 @@
+---
+- hosts: localhost
+  gather_facts: no
+  vars:
+    state: absent
+    project_folder: /Users/Pierre/PyCharmProjects/palindrome-micro
+    deployment_package: lambda.zip
+    event_source_bucket: ivcs-package
+    account: 469333712854
+  tasks:
+  - name: AWS Lambda Function
+    lambda:
+      state: "{{ state | default('present') }}"
+      name: hello
+      code:
+        S3Bucket: ivcs-package
+        S3Key: "project/{{ deployment_package }}"
+        local_path: "{{ project_folder }}/{{ deployment_package }}"
+      config:
+        runtime: python2.7
+        timeout: 3
+        handler: lambda.handler
+        role: API2LambdaExecRole
+#        role: "arn:aws:iam::{{ account }}:role/API2LambdaExecRole"
+        description: lambda funtion test
+        version: 2
+        alias: Dev
+      vpc:
+        subnet_ids:
+        - subnet-77d3085c
+        - subnet-b4910cc3
+        security_group_ids:
+        - sg-cc2b9ca8
+#      policy:
+#      - statement_id: {{event_mappings.type}}-{{bucket}}-{{alias/version}}-{{prefix}}-{{suffix}}-{{events}}
+#        action: lambda:InvokeFunction
+#        source_arn: "arn:aws:s3:::{{ event_source_bucket }}"
+#        source_account:
+#        principal: s3.amazonaws.com
+      event_mappings:
+      - type: s3
+        source_bucket: "{{ event_source_bucket }}"
+        source_account:
+        config:
+        - id: lambda-package-hello-dev
+          lambda_function_arn: "arn:aws:lambda:us-east-1:{{ account }}:function:{{ lambda.name }}:{{ lambda.config.alias }}"
+          events: [ 's3:ObjectCreated:*' ]
+          prefix: "{{ lambda.config.alias }}/"
+          suffix:
+#          filter:
+#            key:
+#              filter_rules:
+#               - name: prefix
+#                 value: "{{ lambda.config.alias }}/"
+      - type: stream
+        uuid:
+        event_source_arn:
+        batch_size:
+        starting_position:
+        enabled:
+
+  - name: show policy stuff...
+    debug: var=response
+
+
+
