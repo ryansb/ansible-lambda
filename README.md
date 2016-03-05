@@ -70,43 +70,6 @@ Add, Update or Delete Lambda related resources. These include 'alias', 'code', '
 
 ```
 
-### ilambda: (WIP)
-___
-Idempotent version. 'local_path' is required. This is a work in progress. Currently, only code/configuration is idempotent.
-
-##### Example Playbook
-```yaml
-- hosts: localhost
-  gather_facts: no
-  vars:
-    state: present
-  tasks:
-  - name: create a function
-    ilambda:
-      state: "{{ state | default('present') }}"
-      type: code
-      function_name: myFunction
-      runtime: python2.7
-      code:
-        s3_bucket: myBucket
-        s3_key: lambda_packages/lambda.zip
-      local_path: /local/path/to/package.zip
-      timeout: 3
-      handler: lambda.handler
-      role: arn:aws:iam::myAccount:role/someAPI2LambdaExecRole
-      description: Another lambda function
-      vpc_config:
-        subnet_ids:
-        - subnet-77d3085a
-        - subnet-b4910cc4
-        security_group_ids:
-        - sg-cc2b9ca4
-      publish: False
-  - name: display stuff
-    debug: var=results
-
-```
-
 ### lambda_invoke:
 ___
 Use to invoke a specific Lambda function.
