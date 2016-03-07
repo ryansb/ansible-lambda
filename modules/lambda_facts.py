@@ -14,6 +14,16 @@
 # You should have received a copy of the GNU General Public License
 # along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
 
+import datetime
+try:
+    import boto3
+    import boto                                         # seems to be needed for ansible.module_utils
+    from botocore.exceptions import ClientError
+    HAS_BOTO3 = True
+except ImportError:
+    HAS_BOTO3 = False
+
+
 DOCUMENTATION = '''
 ---
 module: lambda_facts
@@ -61,13 +71,28 @@ EXAMPLES = '''
   debug: var=Versions
 '''
 
-try:
-    import boto3
-    import boto                                         # seems to be needed for ansible.module_utils
-    from botocore.exceptions import ClientError
-    HAS_BOTO3 = True
-except ImportError:
-    HAS_BOTO3 = False
+
+def fix_return(node):
+    """
+    fixup returned dictionary
+
+    :param node:
+    :return:
+    """
+
+    if isinstance(node, datetime.datetime):
+        node_value = str(node)
+
+    elif isinstance(node, list):
+        node_value = [fix_return(item) for item in node]
+
+    elif isinstance(node, dict):
+        node_value = dict([(item, fix_return(node[item])) for item in node.keys()])
+
+    else:
+        node_value = node
+
+    return node_value
 
 
 def alias_details(client, module):
@@ -305,7 +330,7 @@ def main():
         'policy': policy_details,
         'versions': version_details,
     }
-    lambda_facts = invocations[module.params.get('query')](client, module)
+    lambda_facts = fix_return(invocations[module.params.get('query')](client, module))
 
     results = dict(ansible_facts=lambda_facts, changed=False)
 
