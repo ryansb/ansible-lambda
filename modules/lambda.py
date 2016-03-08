@@ -412,7 +412,7 @@ def get_lambda_config(module, qualifier=None):
     if qualifier:
         api_params.update(Qualifier=qualifier)
 
-    # check if $LATEST function exists and get facts, including sha256 hash
+    # check if function exists and get facts, including sha256 hash
     try:
         results = client.get_function_configuration(**api_params)
 
@@ -575,11 +575,17 @@ def main():
     argument_spec.update(dict(
         state=dict(required=False, default='present', choices=['present', 'absent']),
         name=dict(required=True, default=None, aliases=['function_name']),
-        config=dict(required=True, default=None, aliases=['configuration']),
+        runtime=dict(required=True, default=None),
+        role=dict(required=True, default=None),
+        handler=dict(required=True, default=None),
+        vpc_config=dict(type='dict', required=False, default=None),
+        timeout=dict(type='int', required=False, default=3),
+        memory_size=dict(type='int', required=False, default=128),
         code=dict(type='dict', required=True, default=None, aliases=['function_code']),
         vpc=dict(type='dict', required=False, default=None, aliases=['vpc_config']),
-        publish=dict(required=False, default=None),
-        aliases=dict(type='list', required=False, default=None),
+        publish=dict(type='bool', required=False, default=None),
+        alias=dict(required=False, default=None),
+        version=dict(required=False, default=None),
         event_mappings=dict(type='list', required=False, default=None),
         )
     )
@@ -588,7 +594,7 @@ def main():
         argument_spec=argument_spec,
         supports_check_mode=True,
         mutually_exclusive=[],
-        required_together=[]
+        required_together=[['alias', 'version']]
     )
 
     # validate dependencies
