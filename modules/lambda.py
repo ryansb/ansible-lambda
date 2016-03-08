@@ -278,6 +278,10 @@ def validate_params(module):
     if not os.path.isfile(local_path):
         module.fail_json(msg='Invalid local file path for deployment package: {0}'.format(local_path))
 
+    # parameter 'version' can only be used with state=absent
+    if module.params['state'] == 'present' and module.params['version'] > 0:
+        module.fail_json(msg="Cannot specify a version with state='present'.")
+
     return
 
 
@@ -324,15 +328,15 @@ def get_local_package_hash(module):
     return base64.b64encode(hash_lib.digest())
 
 
-def get_lambda_config(module, qualifier=None):
+def get_lambda_config(module):
 
     client = aws_client(module)
 
     # set API parameters
     api_params = dict(FunctionName=module.params['function_name'])
 
-    if qualifier:
-        api_params.update(Qualifier=qualifier)
+    if module.params['version'] > 0:
+        api_params.update(Qualifier=str(module.params['version']))
 
     # check if function exists and get facts, including sha256 hash
     try:
@@ -378,7 +382,7 @@ def lambda_function(module):
                     upload_to_s3(module)
 
                 api_params = set_api_params(module, ('function_name', ))
-                api_params.update(set_api_params(module, ('s3_bucket', 's3_key', 's3_object_version', 'publish')))
+                api_params.update(set_api_params(module, ('s3_bucket', 's3_key', 's3_object_version')))
 
                 try:
                     if not module.check_mode:
@@ -421,6 +425,17 @@ def lambda_function(module):
                 except (ClientError, ParamValidationError, MissingParametersError), e:
                     module.fail_json(msg='Error updating function config: {0}'.format(e))
 
+            # check if function needs to be published
+            if changed and module.params['publish']:
+                api_params = set_api_params(module, ('function_name', 'description'))
+
+                try:
+                    if not module.check_mode:
+                        results = client.publish_version(**api_params)
+                    changed = True
+                except (ClientError, ParamValidationError, MissingParametersError), e:
+                    module.fail_json(msg='Error publishing version: {0}'.format(e))
+
         else:  # create function
             if not module.check_mode:
                 upload_to_s3(module)
@@ -441,6 +456,10 @@ def lambda_function(module):
         if current_state == 'present':
             # delete the function
             api_params = set_api_params(module, ('function_name', ))
+
+            version = module.params['version']
+            if version > 0:
+                api_params.update(Qualifier=str(version))
 
             try:
                 if not module.check_mode:
@@ -475,8 +494,8 @@ def main():
         timeout=dict(type='int', required=False, default=3),
         memory_size=dict(type='int', required=False, default=128),
         description=dict(required=False, default=None),
-        publish=dict(type='bool', required=False, default=None),
-        # version=dict(required=False, default=None),
+        publish=dict(type='bool', required=False, default=False),
+        version=dict(type='int', required=False, default=0),
         )
     )
 
