@@ -200,18 +200,6 @@ EXAMPLES = '''
   register: my_function_details
 '''
 
-API_PARAMS = dict(
-    code=dict(required=['s3_bucket', 's3_key', 'local_path'], optional=['s3_object_version'], exclude=['local_path']),
-    config=dict(required=['runtime', 'role', 'handler'], optional=['memory_size', 'timeout', 'description'], exclude=[]),
-    vpc=dict(required=['subnet_ids', 'security_group_ids'], optional=[], exclude=[]),
-    aliases=dict(type='list', required=['name', 'version'], optional=['description'], exclude=[]),
-    event_mappings=dict(required=['type'], optional=[], exclude=[]),
-)
-
-
-# ----------------------------------
-#          Helper functions
-# ----------------------------------
 
 def aws_client(module, resource='lambda'):
     """
@@ -260,44 +248,21 @@ def pc(key):
     return "".join([token.capitalize() for token in key.split('_')])
 
 
-def set_api_params(node):
-
-    if isinstance(node, list):
-        node_value = [set_api_params(item) for item in node]
-
-    elif isinstance(node, dict):
-        node_value = dict([(pc(item), set_api_params(node[item])) for item in node.keys()])
-
-    else:
-        node_value = node
-
-    return node_value
-
-
-def check_sub_params(module, parameter):
-    """
-    Not so much checking as converting key case.  Let the API do most of the checking.
-
-    :param module:
-    :param parameter
-    :return:
-    """
-
-    if not isinstance(parameter, dict):
-        module.fail_json(msg="Sub-parameters must be a dictionary. Found: {0}".format(parameter))
+def set_api_params(module, module_params):
 
     api_params = dict()
 
-    for key in parameter:
-        api_params[pc(key)] = parameter[key]
+    for param in module_params:
+        module_param = module.params.get(param, None)
+        if module_param:
+            api_params[pc(param)] = module_param
 
     return api_params
 
 
-
 def validate_params(module):
 
-    function_name = module.params['name']
+    function_name = module.params['function_name']
 
     # validate function name
     if not re.search('^[\w\-:]+$', function_name):
@@ -307,47 +272,13 @@ def validate_params(module):
     if len(function_name) > 64:
         module.fail_json(msg='Function name "{0}" exceeds 64 character limit'.format(function_name))
 
-    # validate remaining parameters
-    valid_param_groups = []
-
-    for param_group in API_PARAMS.keys():
-        module_param_group = module.params.get(param_group, None)
-        if module_param_group:
-            if isinstance(module_param_group, list):
-                param_dict_list = module_param_group
-            else:
-                param_dict_list = [module_param_group]
-
-            for param_dict in param_dict_list:
-                module_params = param_dict.copy()
-
-                # check for presence of required params
-                for param in API_PARAMS[param_group]['required']:
-                    if param in module_params:
-                        module_params.pop(param)
-                    else:
-                        module.fail_json(msg="Sub-parameter '{0}' required for parameter '{1}'.".format(param, param_group))
-
-                # remove all valid optional params
-                for param in API_PARAMS[param_group]['optional']:
-                    if param in module_params:
-                        module_params.pop(param)
-
-                # if dictionary is not empty, then there must be invalid params
-                if module_params:
-                    invalid_params = ', '.join(module_params.keys())
-                    module.fail_json(msg="Invalid sub-parameter(s) '{0}' for parameter '{1}'.".format(invalid_params, param_group))
-
-                valid_param_groups.append(param_group)
-
     # validate local path of deployment package
-    local_path = module.params['code']['local_path']
+    local_path = module.params['local_path']
 
     if not os.path.isfile(local_path):
         module.fail_json(msg='Invalid local file path for deployment package: {0}'.format(local_path))
 
-    return valid_param_groups
-
+    return
 
 
 def upload_to_s3(module):
@@ -361,9 +292,9 @@ def upload_to_s3(module):
     client = aws_client(module, resource='s3')
     s3 = S3Transfer(client)
 
-    local_path = module.params['code']['local_path']
-    s3_bucket = module.params['code']['s3_bucket']
-    s3_key = module.params['code']['s3_key']
+    local_path = module.params['local_path']
+    s3_bucket = module.params['s3_bucket']
+    s3_key = module.params['s3_key']
 
     try:
         s3.upload_file(local_path, s3_bucket, s3_key)
@@ -381,7 +312,7 @@ def get_local_package_hash(module):
     :return:
     """
 
-    local_path = module.params['code']['local_path']
+    local_path = module.params['local_path']
 
     block_size = os.statvfs(local_path).f_bsize
     hash_lib = hashlib.sha256()
@@ -397,17 +328,8 @@ def get_lambda_config(module, qualifier=None):
 
     client = aws_client(module)
 
-    # validate function name
-    function_name = module.params['name']
-    if not re.search('^[\w\-:]+$', function_name):
-        module.fail_json(
-                msg='Function name {0} is invalid. Names must contain only alphanumeric characters and hyphens.'.format(function_name)
-        )
-    if len(function_name) > 64:
-        module.fail_json(msg='Function name "{0}" exceeds 64 character limit'.format(function_name))
-
     # set API parameters
-    api_params = dict(FunctionName=function_name)
+    api_params = dict(FunctionName=module.params['function_name'])
 
     if qualifier:
         api_params.update(Qualifier=qualifier)
@@ -425,17 +347,6 @@ def get_lambda_config(module, qualifier=None):
     return results
 
 
-# ----------------------------------
-#   Resource management functions
-# ----------------------------------
-
-def get_api_params(required_params, module, required=True): pass
-
-def get_latest_version(module):
-
-    pass
-
-
 def lambda_function(module):
     """
     Adds, updates or deletes lambda function code.
@@ -447,30 +358,13 @@ def lambda_function(module):
     client = aws_client(module)
     results = dict()
     changed = False
-    api_params = dict()
-    current_state = None
+    current_state = 'absent'
+    state = module.params['state']
 
-    state = module.params.get('state')
-
-    # required_params = ('name', 'local_path')
-    # api_params.update(get_api_params(required_params, module, required=True))
-    # api_params.pop(pc('local_path'))
-    #
-    # optional_params = ('qualifier',)
-    # api_params.update(get_api_params(optional_params, module, required=False))
-    api_params['FunctionName'] = module.params['name']
-
-    # check if $LATEST function exists and get facts, including sha256 hash
-    try:
-        results = client.get_function_configuration(**api_params)
+    facts = get_lambda_config(module)
+    if facts:
         current_state = 'present'
-    except ClientError, e:
-        if e.response['Error']['Code'] == 'ResourceNotFoundException':
-            current_state = 'absent'
-        else:
-            module.fail_json(msg='Error retrieving function configuration: {0}'.format(e))
 
-    facts = results
     if state == 'present':
         if current_state == 'present':
 
@@ -483,15 +377,8 @@ def lambda_function(module):
                 if not module.check_mode:
                     upload_to_s3(module)
 
-                required_params = ('code', 'config')
-                optional_params = ('publish', )
-
-                temp_params = get_api_params(required_params, module, required=True)
-                code_params = temp_params.pop('Code')
-                api_params.update(temp_params)
-                api_params.update(code_params)
-
-                api_params.update(get_api_params(optional_params, module, required=False))
+                api_params = set_api_params(module, ('function_name', ))
+                api_params.update(set_api_params(module, ('s3_bucket', 's3_key', 's3_object_version', 'publish')))
 
                 try:
                     if not module.check_mode:
@@ -502,17 +389,30 @@ def lambda_function(module):
 
             # check if config has changed
             config_changed = False
-            optional_params = ('role', 'handler', 'description', 'timeout', 'memory_size', 'vpc_config')
-            for param in optional_params:
-                if module.params.get(param, None):
-                    if module.params[param] != facts.get(pc(param)):
-                        config_changed = True
-                        break
+            config_params = ('role', 'handler', 'description', 'timeout', 'memory_size')
+            for param in config_params:
+                if module.params.get(param) != facts.get(pc(param)):
+                    config_changed = True
+                    break
 
-            if config_changed:
-                required_params = ('function_name', )
-                api_params = get_api_params(required_params, module, required=True)
-                api_params.update(get_api_params(optional_params, module, required=False))
+            # check if VPC config has changed
+            vpc_changed = False
+            vpc_params = ('subnet_ids', 'security_group_ids')
+            for param in vpc_params:
+                current_vpc_config = facts.get('VpcConfig', dict())
+                if sorted(module.params.get(param, [])) != sorted(current_vpc_config.get(pc(param), [])):
+                    vpc_changed = True
+                    break
+
+            if config_changed or vpc_changed:
+                api_params = set_api_params(module, ('function_name', ))
+                api_params.update(set_api_params(module, config_params))
+
+                if module.params.get('subnet_ids'):
+                    api_params.update(VpcConfig=set_api_params(module, vpc_params))
+                else:
+                    # to remove the VPC config, its parameters must be explicitly set to empty lists
+                    api_params.update(VpcConfig=dict(SubnetIds=[], SecurityGroupIds=[]))
 
                 try:
                     if not module.check_mode:
@@ -525,11 +425,10 @@ def lambda_function(module):
             if not module.check_mode:
                 upload_to_s3(module)
 
-            required_params = ('code', 'runtime', 'role', 'handler')
-            optional_params = ('memory_size', 'timeout', 'description', 'publish', 'vpc_config')
-
-            api_params.update(get_api_params(required_params, module, required=True))
-            api_params.update(get_api_params(optional_params, module, required=False))
+            api_params = set_api_params(module, ('function_name', 'runtime', 'role', 'handler'))
+            api_params.update(set_api_params(module, ('memory_size', 'timeout', 'description', 'publish')))
+            api_params.update(Code=set_api_params(module, ('s3_bucket', 's3_key', 's3_object_version')))
+            api_params.update(VpcConfig=set_api_params(module, ('subnet_ids', 'security_group_ids')))
 
             try:
                 if not module.check_mode:
@@ -541,6 +440,8 @@ def lambda_function(module):
     else:  # state = 'absent'
         if current_state == 'present':
             # delete the function
+            api_params = set_api_params(module, ('function_name', ))
+
             try:
                 if not module.check_mode:
                     results = client.delete_function(**api_params)
@@ -548,23 +449,10 @@ def lambda_function(module):
             except ClientError, e:
                 module.fail_json(msg='Error deleting function: {0}'.format(e))
 
-    return dict(changed=changed, results=results)
+    return dict(changed=changed, ansible_facts=dict(lambda_facts=results or facts))
 
 
-def vpc_config(module):
-    """
-
-    :param module:
-    :return:
-    """
-
-    return dict()
-
-
-# ----------------------------------
-#           Main function
-# ----------------------------------
-
+# -----------------------------------------------------------------------------------------------
 def main():
     """
     Main entry point.
@@ -574,19 +462,21 @@ def main():
     argument_spec = ec2_argument_spec()
     argument_spec.update(dict(
         state=dict(required=False, default='present', choices=['present', 'absent']),
-        name=dict(required=True, default=None, aliases=['function_name']),
+        function_name=dict(required=True, default=None, aliases=['name']),
         runtime=dict(required=True, default=None),
         role=dict(required=True, default=None),
         handler=dict(required=True, default=None),
-        vpc_config=dict(type='dict', required=False, default=None),
+        s3_bucket=dict(required=True, default=None, aliases=['code_s3_bucket']),
+        s3_key=dict(required=True, default=None, aliases=['code_s3_key']),
+        s3_object_version=dict(required=False, default=None, aliases=['code_s3_object_version']),
+        local_path=dict(required=True, default=None),
+        subnet_ids=dict(type='list', required=False, default=[], aliases=['vpc_subnet_ids']),
+        security_group_ids=dict(type='list', required=False, default=[], aliases=['vpc_security_group_ids']),
         timeout=dict(type='int', required=False, default=3),
         memory_size=dict(type='int', required=False, default=128),
-        code=dict(type='dict', required=True, default=None, aliases=['function_code']),
-        vpc=dict(type='dict', required=False, default=None, aliases=['vpc_config']),
+        description=dict(required=False, default=None),
         publish=dict(type='bool', required=False, default=None),
-        alias=dict(required=False, default=None),
-        version=dict(required=False, default=None),
-        event_mappings=dict(type='list', required=False, default=None),
+        # version=dict(required=False, default=None),
         )
     )
 
@@ -594,51 +484,17 @@ def main():
         argument_spec=argument_spec,
         supports_check_mode=True,
         mutually_exclusive=[],
-        required_together=[['alias', 'version']]
+        required_together=[['subnet_ids', 'security_group_ids']]
     )
 
     # validate dependencies
     if not HAS_BOTO3:
         module.fail_json(msg='Both boto3 & boto are required for this module.')
 
-    top_params = validate_params(module)
+    validate_params(module)
 
-    changed = False
-    results = set_api_params(module.params)
+    results = lambda_function(module)
 
-    state = module.params['state']
-
-    facts = get_lambda_config(module)
-
-    if state == 'present':
-        if facts:
-            pass  # check update
-        else:
-            pass  # create
-    else:
-        if facts:
-            # delete
-            changed = True
-        else:
-            changed = False
-
-    # response = lambda_function(module)
-    # results = response['results']
-    # changed = response['changed']
-
-    # # process event mappings if defined
-    # if module.params.get('event_mappings'):
-    #     response = event_mappings(module)
-    #     results.update(response['results'])
-    #     changed = changed or response['changed']
-
-    # process vpc config if defined
-    # if module.params.get('vpc'):
-    #     response = vpc_config(module)
-    #     results.update(response['results'])
-    #     changed = changed or response['changed']
-
-    results = dict(ansible_facts=dict(results=results), changed=changed)
     module.exit_json(**results)
 
 
