@@ -1,0 +1,31 @@
+---
+- hosts: localhost
+  gather_facts: no
+  vars:
+    state: present
+    project_folder: /path/to/deployment/package
+    deployment_package: lambda.zip
+    account: 123456789012
+    version_to_delete: 0
+
+  tasks:
+  - name: Minimal required parameters for Lambda Function
+    lambda:
+      state: "{{ state | default('present') }}"
+      name: myLambdaFuntion
+      code_s3_bucket: package-bucket
+      code_s3_key: "lambda/{{ deployment_package }}"
+      local_path: "{{ project_folder }}/{{ deployment_package }}"
+      runtime: python2.7
+      handler: lambda.handler
+      role: "arn:aws:iam::{{ account }}:role/API2LambdaExecRole"
+
+  - name: show results
+    debug: var=lambda_facts
+
+  - name: "alias 'Dev' for function {{ lambda_facts.FunctionName }} "
+    lambda_alias:
+      state: "{{ state | default('present') }}"
+      function_name: "{{ lambda_facts.FunctionName }}"
+      name: Dev
+      description: Development is $LATEST version

@@ -53,7 +53,7 @@
   
     <link rel="top" title="Ansible Documentation" href="index.html"/>
         <link rel="up" title="All Modules" href="list_of_all_modules.html"/>
-        <link rel="next" title="lambda_facts - Gathers AWS Lambda function details as Ansible facts" href="lambda_facts_module.html"/>
+        <link rel="next" title="lambda_alias - Creates, updates or deletes AWS Lambda function aliases." href="lambda_alias_module.html"/>
         <link rel="prev" title="command - Executes a command on a remote node" href="command_module.html"/> 
 
   <script src="//cdnjs.cloudflare.com/ajax/libs/modernizr/2.6.2/modernizr.min.js"></script>
@@ -488,7 +488,6 @@
 <blockquote>
 <div><div class="highlight-YAML"><div class="highlight"><pre><span></span><span class="nn">---</span>
 <span class="c1"># Simple example to create a lambda function and publish a version</span>
-<span class="nn">---</span>
 <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">hosts</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">localhost</span>
   <span class="l l-Scalar l-Scalar-Plain">gather_facts</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">no</span>
   <span class="l l-Scalar l-Scalar-Plain">vars</span><span class="p p-Indicator">:</span>
@@ -538,7 +537,7 @@
   
     <div class="rst-footer-buttons">
       
-        <a href="lambda_facts_module.html" class="btn btn-neutral float-right" title="lambda_facts - Gathers AWS Lambda function details as Ansible facts"/>Next <span class="icon icon-circle-arrow-right"></span></a>
+        <a href="lambda_alias_module.html" class="btn btn-neutral float-right" title="lambda_alias - Creates, updates or deletes AWS Lambda function aliases."/>Next <span class="icon icon-circle-arrow-right"></span></a>
       
       
         <a href="command_module.html" class="btn btn-neutral" title="command - Executes a command on a remote node"><span class="icon icon-circle-arrow-left"></span> Previous</a>
@@ -550,7 +549,7 @@
 
   <p>
   &copy; Copyright 2016 <a href="http://ansible.com">Ansible, Inc.</a>.
-    Last updated on Mar 08, 2016.
+    Last updated on Mar 09, 2016.
   </p>
 
 Ansible docs are generated from <a href="https://github.com/ansible/ansible">GitHub sources</A> using <A HREF="http://sphinx-doc.org/">Sphinx</A> using a theme provided by <a href="http://readthedocs.org">Read the Docs</a>. . Module documentation is not edited directly, but is generated from the source code for the modules.  To submit an update to module docs, edit the 'DOCUMENTATION' metadata in the <A HREF="https://github.com/ansible/ansible-modules-core">core</A> and <A HREF="https://github.com/ansible/ansible-modules-extras">extras</A> modules source repositories. 

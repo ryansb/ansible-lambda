@@ -38,7 +38,7 @@ Gathers facts related to AWS Lambda functions.
 
 ### lambda:
 ___
-Idempotent version.  This is a work in progress. Currently, only code/configuration is idempotent.
+Use to create, update or delete lambda functions and publish versions.
 
 ##### Example Playbook
 ```yaml
@@ -73,6 +73,54 @@ Idempotent version.  This is a work in progress. Currently, only code/configurat
         - sg-999b9ca8
   - name: show results
     debug: var=lambda_facts
+
+```
+
+### lambda_alias:
+___
+Use to create, update or delete lambda function aliases.
+
+##### Example Playbook
+```yaml
+- hosts: localhost
+  gather_facts: no
+  vars:
+    state: present
+    project_folder: /path/to/deployment/package
+    deployment_package: lambda.zip
+    account: 123456789012
+  tasks:
+  - name: AWS Lambda Function
+    lambda:
+      state: "{{ state | default('present') }}"
+      name: myLambdaFuntion
+      publish: True
+      description: lambda funtion description
+      code_s3_bucket: package-bucket
+      code_s3_key: "lambda/{{ deployment_package }}"
+      local_path: "{{ project_folder }}/{{ deployment_package }}"
+      runtime: python2.7
+      timeout: 5
+      handler: lambda.handler
+      memory_size: 128
+      role: "arn:aws:iam::{{ account }}:role/API2LambdaExecRole"
+  # The following will set the Dev alias to the latest version ($LATEST) since version is omitted (or = 0)
+  - name: "alias 'Dev' for function {{ lambda_facts.FunctionName }} "
+    lambda_alias:
+      state: "{{ state | default('present') }}"
+      function_name: "{{ lambda_facts.FunctionName }}"
+      name: Dev
+      description: Development is $LATEST version
+
+  # The QA alias will only be created when a new version is published (i.e. not = '$LATEST')
+  - name: "alias 'QA' for function {{ lambda_facts.FunctionName }} "
+    lambda_alias:
+      state: "{{ state | default('present') }}"
+      function_name: "{{ lambda_facts.FunctionName }}"
+      name: QA
+      version: "{{ lambda_facts.Version }}"
+      description: "QA is version {{ lambda_facts.Version }}"
+    when: lambda_facts.Version != "$LATEST"
 
 ```
 
