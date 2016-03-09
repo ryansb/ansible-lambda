@@ -136,7 +136,6 @@ options:
 EXAMPLES = '''
 ---
 # Simple example to create a lambda function and publish a version
----
 - hosts: localhost
   gather_facts: no
   vars:
