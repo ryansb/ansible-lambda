@@ -7,8 +7,9 @@
     deployment_package: lambda.zip
     account: 123456789012
     version_to_delete: 0
+
   tasks:
-  - name: AWS Lambda Function
+  - name: AWS Lambda Function with all parameters
     lambda:
       state: "{{ state | default('present') }}"
       name: myLambdaFuntion
@@ -28,5 +29,18 @@
         - subnet-99910cc3
       vpc_security_group_ids:
         - sg-999b9ca8
+  - name: show results
+    debug: var=lambda_facts
+
+  - name: Minimal required parameters for Lambda Function
+    lambda:
+      state: "{{ state | default('present') }}"
+      name: myLambdaFuntion
+      code_s3_bucket: package-bucket
+      code_s3_key: "lambda/{{ deployment_package }}"
+      local_path: "{{ project_folder }}/{{ deployment_package }}"
+      runtime: python2.7
+      handler: lambda.handler
+      role: "arn:aws:iam::{{ account }}:role/API2LambdaExecRole"
   - name: show results
     debug: var=lambda_facts
