@@ -32,172 +32,142 @@ except ImportError:
 DOCUMENTATION = '''
 ---
 module: lambda
-short_description: Creates, updates or deletes AWS Lambda functions, related configs, aliases and mappings.
+short_description: Creates, updates or deletes AWS Lambda functions, configs and versions.
 description:
-    - This module allows the mamangement of AWS Lambda functions and their related resources via the Ansible
+    - This module allows the management of AWS Lambda functions and their related resources via the Ansible
       framework.  It is idempotent and supports "Check" mode.
 version_added: "2.0"
 author: Pierre Jodouin (@pjodouin)
 options:
   name:
     description:
-      - The name you want to assign to the function you are uploading. You can specify an unqualified function 
+      - The name you want to assign to the function. You can specify an unqualified function
         name (for example, "Thumbnail") or you can specify Amazon Resource Name (ARN) of the function 
         (for example, 'arn:aws:lambda:us-west-2:account-id:function:ThumbNail'). AWS Lambda also allows you to
         specify only the account ID qualifier (for example, 'account-id:Thumbnail'). Note that the length
         constraint applies only to the ARN. If you specify only the function name, it is limited to 64 character 
         in length.
-    required: false
+    required: true
     aliases: [ "function_name" ]
   state:
     description:
-      - Describes the desired state of the resource and defaults to "present"
-    required: false
+      - Describes the desired state and defaults to "present".
+    required: true
     default: "present"
     choices: ["present", "absent"]
   runtime:
     description:
       - Runtime environment of the Lambda function. Cannot be changed after creating the function.
-    required: false
-  code:
+    required: true
+  code_s3_bucket:
     description:
-      - Dictionary of items which describe where to find the function code to be uploaded to AWS.  Typically, this
-        is a simple file or deployment package bundled in a ZIP archive file.
-      - C(s3_bucket:)  S3 bucket name.
-      - C(s3_key:)     S3 key name.
-      - C(local_path:) Complete local file path of the deployment package bundled in a ZIP archive.
+      - S3 bucket name where the .zip file containing your deployment package is stored.
+        This bucket must reside in the same AWS region where you are creating the Lambda function.
+    required: true
+    aliases: ['s3_bucket']
+  code_s3_key:
+    description:
+      - S3 object (the deployment package) key name you want to upload.
+    required: true
+    aliases: ['s3_key']
+  code_s3_object_version:
+    description:
+      - S3 object (the deployment package) version you want to upload.
     required: false
+    aliases: ['s3_object_version']
+  local_path:
+    description:
+      - Complete local file path of the deployment package bundled in a ZIP archive.
+    required: true
   handler:
     description:
       - The function within your code that Lambda calls to begin execution.
-    required: false
+    required: true
   role:
     description:
       - The Amazon Resource Name (ARN) of the IAM role that Lambda assumes when it executes your function to access 
         any other Amazon Web Services (AWS) resources.
-    required: false
+    required: true
   timeout:
     description:
       - The function execution time at which Lambda should terminate the function. Because the execution time has cost 
         implications, we recommend you set this value based on your expected execution time. The default is 3 seconds.
     required: false
-  memory:
+    default: 3
+  memory_size:
     description:
       - The amount of memory, in MB, your Lambda function is given. Lambda uses this memory size to infer the amount of 
         CPU and memory allocated to your function. Your function use-case determines your CPU and memory requirements. 
         For example, a database operation might need less memory compared to an image processing function. The default 
         value is 128 MB. The value must be a multiple of 64 MB.
     required: false
+    default: 128
   publish:
     description:
-      - This boolean parameter can be used to request AWS Lambda to create the Lambda function and publish a version as 
-        an atomic operation.
+      - This boolean parameter is used to publish a version of the function from the current snapshot of $LATEST.
+        The code and configuration cannot be modified after publication.
     required: false
+    default: false
   description:
     description:
       - A short, user-defined function description. Lambda does not use this value. Assign a meaningful description 
         as you see fit.
     required: false
-  uuid:
+  version:
     description:
-      - The AWS Lambda assigned ID of the event source mapping.
+      -  Version number of the Lambda function to be deleted. This parameter cannot be used with state=present.
+         A value of 0 is ignored.
     required: false
-  name:
-    description:
-      -  Name of the function alias.
-    required: false
-  function_version:
-    description:
-      -  Version number of the Lambda function.
-    required: false
-    aliases: [ "version" ]
-  qualifier:
-    description:
-      - You can specify this optional query parameter to specify function version or alias name in which case this 
-        API will return all permissions associated with the specific ARN. If you don't provide this parameter, the 
-        API will return permissions that apply to the unqualified function ARN.
-    required: false
-  statement_id:
-    description:
-      -  A unique statement identifier.
-    required: false
-    aliases: [ "sid" ]
-  action:
-    description:
-      -  The AWS Lambda action you want to allow in this permission statement. Each Lambda action is a string starting
-         with "lambda:" followed by the API name
-    required: false
-  principal:
-    description:
-      -  The principal who is getting this permission. It can be Amazon S3 service Principal ("s3.amazonaws.com") if
-         you want Amazon S3 to invoke the function, an AWS account ID if you are granting cross-account permission, or
-         any valid AWS service principal such as "sns.amazonaws.com".
-    required: false
-  source_account:
-    description:
-      -  The AWS account ID (without a hyphen) of the source owner. For example, if the SourceArn identifies a bucket,
-         then this is the bucket owner's account ID. You can use this additional condition to ensure the bucket you
-         specify is owned by a specific account.
-    required: false
-  source_arn:
-    description:
-      -  This is optional; however, when granting Amazon S3 permission to invoke your function, you should specify this
-         field with the bucket Amazon Resource Name (ARN) as its value. This ensures that only events generated from
-         the specified bucket can invoke the function.
-    required: false
-  starting_position:
-    description:
-      -  The position in the stream where AWS Lambda should start reading ('TRIM_HORIZON' or 'LATEST').
-    required: false
-    choices: [ "TRIM_HORIZON", "LATEST" ]
-  enabled:
-    description:
-      -  Indicates whether AWS Lambda should begin polling the event source. By default, Enabled is true.
-    required: false
-  batch_size:
-    description:
-      -  The largest number of records that AWS Lambda will retrieve from your event source at the time of invoking
-         your function. Your function receives an event with all the retrieved records. The default is 100 records.
-    required: false
-  event_source_arn:
-    description:
-      -  The Amazon Resource Name (ARN) of the Amazon Kinesis or the Amazon DynamoDB stream that is the event source.
-         Any record added to this stream could cause AWS Lambda to invoke your Lambda function, it depends on the
-         BatchSize . AWS Lambda POSTs the Amazon Kinesis event, containing records, to your Lambda function as JSON.
-    required: false
-  code_sha256:
-    description:
-      -  The SHA256 hash of the deployment package you want to publish. This provides validation on the code you are
-         publishing. If you provide this parameter value must match the SHA256 of the HEAD version for the publication
-         to succeed.
-    required: false
-  vpc_config:
+  vpc_subnet_ids:
     description:
       -  If your Lambda function accesses resources in a VPC, you provide this parameter identifying the list of
-         security group IDs and subnet IDs. These must belong to the same VPC. You must provide at least one security
-         group and one subnet ID.
+         subnet IDs. These must belong to the same VPC. You must provide at least one subnet ID.
     required: false
+    aliases: ['subnet_ids']
+  vpc_security_group_ids:
+    description:
+      -  If your Lambda function accesses resources in a VPC, you provide this parameter identifying the list of
+         security group IDs. You must provide at least one security group ID.
+    required: false
+    aliases: ['security_group_ids']
+
 '''
 
 EXAMPLES = '''
 ---
 # Simple example to create a lambda function and publish a version
-- name: Create Lambda Function
-  lambda:
-    type: code
-    function_name: myFunction
+---
+- hosts: localhost
+  gather_facts: no
+  vars:
     state: present
-    runtime: python2.7
-    code:
-      S3Bucket: lambda-function-packages
-      S3Key: system1/lambda_deployment.zip
-    local_path: /var/projects/projectName/lambda_deployment.zip
-    timeout: 3
-    handler: lambda.handler
-    role: arn:aws:iam::999999999999:role/API2LambdaExecRole
-    description: This is a Lambda function
-    publish: True
-  register: my_function_details
+    project_folder: /path/to/deployment/package
+    deployment_package: lambda.zip
+    account: 123456789012
+    version_to_delete: 0
+  tasks:
+  - name: AWS Lambda Function
+    lambda:
+      state: "{{ state | default('present') }}"
+      name: myLambdaFunction
+      publish: True
+      description: lambda function description
+      code_s3_bucket: package-bucket
+      code_s3_key: "lambda/{{ deployment_package }}"
+      local_path: "{{ project_folder }}/{{ deployment_package }}"
+      runtime: python2.7
+      timeout: 5
+      handler: lambda.handler
+      memory_size: 128
+      role: "arn:aws:iam::{{ account }}:role/API2LambdaExecRole"
+      version: "{{ version_to_delete }}"
+      vpc_subnet_ids:
+        - subnet-9993085c
+        - subnet-99910cc3
+      vpc_security_group_ids:
+        - sg-999b9ca8
+  - name: show results
+    debug: var=lambda_facts
 '''
 
 
@@ -226,6 +196,12 @@ def aws_client(module, resource='lambda'):
 
 
 def get_account_id(module):
+    """
+    Returns the account ID.
+
+    :param module:
+    :return:
+    """
 
     client = aws_client(module, resource='iam')
 
@@ -249,6 +225,13 @@ def pc(key):
 
 
 def set_api_params(module, module_params):
+    """
+    Sets module parameters to those expected by the boto3 API.
+
+    :param module:
+    :param module_params:
+    :return:
+    """
 
     api_params = dict()
 
@@ -261,6 +244,12 @@ def set_api_params(module, module_params):
 
 
 def validate_params(module):
+    """
+    Performs basic parameter validation.
+
+    :param module:
+    :return:
+    """
 
     function_name = module.params['function_name']
 
@@ -329,6 +318,12 @@ def get_local_package_hash(module):
 
 
 def get_lambda_config(module):
+    """
+    Returns the lambda function configuration if it exists.
+
+    :param module:
+    :return:
+    """
 
     client = aws_client(module)
 
@@ -353,7 +348,7 @@ def get_lambda_config(module):
 
 def lambda_function(module):
     """
-    Adds, updates or deletes lambda function code.
+    Adds, updates or deletes lambda function code and configuration.
 
     :param client: AWS API client reference (boto3)
     :param module: Ansible module reference
@@ -471,7 +466,6 @@ def lambda_function(module):
     return dict(changed=changed, ansible_facts=dict(lambda_facts=results or facts))
 
 
-# -----------------------------------------------------------------------------------------------
 def main():
     """
     Main entry point.
