@@ -86,7 +86,7 @@ options:
   role:
     description:
       - The Amazon Resource Name (ARN) of the IAM role that Lambda assumes when it executes your function to access 
-        any other Amazon Web Services (AWS) resources.
+        any other AWS resources.  If the role belongs to the same account, the simple role name can be used.
     required: true
   timeout:
     description:
@@ -158,7 +158,7 @@ EXAMPLES = '''
       timeout: 5
       handler: lambda.handler
       memory_size: 128
-      role: "arn:aws:iam::{{ account }}:role/API2LambdaExecRole"
+      role: API2LambdaExecRole
       version: "{{ version_to_delete }}"
       vpc_subnet_ids:
         - subnet-9993085c
@@ -269,6 +269,12 @@ def validate_params(module):
     # parameter 'version' can only be used with state=absent
     if module.params['state'] == 'present' and module.params['version'] > 0:
         module.fail_json(msg="Cannot specify a version with state='present'.")
+
+    # check if 'role' needs to be expanded in full ARN format
+    if not module.params['role'].startswith('arn:aws:iam:'):
+        role = module.params['role']
+        account = get_account_id(module)
+        module.params['role'] = 'arn:aws:iam::{0}:role/{1}'.format(account, role)
 
     return
 

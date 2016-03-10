@@ -103,7 +103,7 @@ Use to create, update or delete lambda function aliases.
       timeout: 5
       handler: lambda.handler
       memory_size: 128
-      role: "arn:aws:iam::{{ account }}:role/API2LambdaExecRole"
+      role: API2LambdaExecRole
   # The following will set the Dev alias to the latest version ($LATEST) since version is omitted (or = 0)
   - name: "alias 'Dev' for function {{ lambda_facts.FunctionName }} "
     lambda_alias:

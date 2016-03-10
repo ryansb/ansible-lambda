@@ -442,7 +442,7 @@
 <td>yes</td>
 <td></td>
     <td><ul></ul></td>
-    <td><div>The Amazon Resource Name (ARN) of the IAM role that Lambda assumes when it executes your function to access any other Amazon Web Services (AWS) resources.</div></td></tr>
+    <td><div>The Amazon Resource Name (ARN) of the IAM role that Lambda assumes when it executes your function to access any other AWS resources.  If the role belongs to the same account, the simple role name can be used.</div></td></tr>
         <tr>
 <td>runtime<br/><div style="font-size: small;"></div></td>
 <td>yes</td>
@@ -510,7 +510,7 @@
       <span class="l l-Scalar l-Scalar-Plain">timeout</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">5</span>
       <span class="l l-Scalar l-Scalar-Plain">handler</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">lambda.handler</span>
       <span class="l l-Scalar l-Scalar-Plain">memory_size</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">128</span>
-      <span class="l l-Scalar l-Scalar-Plain">role</span><span class="p p-Indicator">:</span> <span class="s">&quot;arn:aws:iam::{{</span><span class="nv"> </span><span class="s">account</span><span class="nv"> </span><span class="s">}}:role/API2LambdaExecRole&quot;</span>
+      <span class="l l-Scalar l-Scalar-Plain">role</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">API2LambdaExecRole</span>
       <span class="l l-Scalar l-Scalar-Plain">version</span><span class="p p-Indicator">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">version_to_delete</span><span class="nv"> </span><span class="s">}}&quot;</span>
       <span class="l l-Scalar l-Scalar-Plain">vpc_subnet_ids</span><span class="p p-Indicator">:</span>
         <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">subnet-9993085c</span>
@@ -549,7 +549,7 @@
 
   <p>
   &copy; Copyright 2016 <a href="http://ansible.com">Ansible, Inc.</a>.
-    Last updated on Mar 09, 2016.
+    Last updated on Mar 10, 2016.
   </p>
 
 Ansible docs are generated from <a href="https://github.com/ansible/ansible">GitHub sources</A> using <A HREF="http://sphinx-doc.org/">Sphinx</A> using a theme provided by <a href="http://readthedocs.org">Read the Docs</a>. . Module documentation is not edited directly, but is generated from the source code for the modules.  To submit an update to module docs, edit the 'DOCUMENTATION' metadata in the <A HREF="https://github.com/ansible/ansible-modules-core">core</A> and <A HREF="https://github.com/ansible/ansible-modules-extras">extras</A> modules source repositories. 
