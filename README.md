@@ -157,9 +157,9 @@ Do the following to install the lambda modules in your Ansible environment:
 
 1. Clone this repository or download the ZIP file.
 
-2. Copy the *.py files from the modules folder to your installation custom module folder (usually /etc/ansible/modules).
+2. Copy the *.py files from the modules directory to your installation custom module directory.  This is, by default, in `./library` which is relative to where your playbooks are located. Refer to the [docs](http://docs.ansible.com/ansible/developing_modules.html#developing-modules) for more information.
 
-3. Copy the *.py files from the plugins folder to your installation custom plugin folder.
+3. Copy the *.py files from the plugins directory to your installation custom plugin directory. Custom plugins will go in a directory relating to the plugin type, e.g. a lookup plugin will got into `./lookup_plugins` relative to where your playbooks are located. Refer to the [docs](http://docs.ansible.com/ansible/developing_plugins.html#distributing-plugins) for more information.
 
 4. Make sure boto3 is installed.
 
