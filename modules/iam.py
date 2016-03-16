@@ -19,7 +19,7 @@ DOCUMENTATION = '''
 module: iam
 short_description: Manage IAM users, groups, roles and keys
 description:
-     - Allows for the management of IAM users, groups, roles and access keys.
+     - Allows for the management of IAM users, user API keys, groups, roles.
 version_added: "2.0"
 options:
   iam_type:
@@ -27,7 +27,7 @@ options:
       - Type of IAM resource
     required: true
     default: null
-    choices: [ "user", "group", "role"]
+    choices: ["user", "group", "role"]
   name:
     description:
       - Name of IAM resource to create or identify
@@ -624,7 +624,7 @@ def main():
 
     try:
         if region:
-            iam = boto.iam.connect_to_region(region, **aws_connect_kwargs)
+            iam = connect_to_aws(boto.iam, region, **aws_connect_kwargs)
         else:
             iam = boto.iam.connection.IAMConnection(**aws_connect_kwargs)
     except boto.exception.NoAuthHandlerFound, e:
