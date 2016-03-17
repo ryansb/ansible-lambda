@@ -58,12 +58,13 @@ options:
       - The inline (JSON or YAML) trust policy document that grants an entity permission to assume the role. Mutually exclusive with C(trust_policy_filepath).
     required: false
     default: null
+    version_added: "2.1"
   trust_policy_filepath:
     description:
       - The path to the trust policy document that grants an entity permission to assume the role. Mutually exclusive with C(trust_policy).
     required: false
     default: null
-
+    version_added: "2.1"
   access_key_state:
     description:
       - When type is user, it creates, removes, deactivates or activates a user's access key(s). Note that actions apply only to keys specified.
@@ -711,7 +712,7 @@ def main():
 
         elif state == 'update' and not user_exists:
             module.fail_json(
-                msg="The user %s does not exit. No update made." % name)
+                msg="The user %s does not exist. No update made." % name)
 
         elif state == 'absent':
             if user_exists:
