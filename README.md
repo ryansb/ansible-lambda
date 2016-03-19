@@ -1,11 +1,12 @@
 # Ansible Cloud Modules & Plugins for AWS Lambda
-#### Version 0.5 [![Build Status](https://travis-ci.org/pjodouin/ansible-lambda.svg)](https://travis-ci.org/pjodouin/ansible-lambda)
+#### Version 0.6 [![Build Status](https://travis-ci.org/pjodouin/ansible-lambda.svg)](https://travis-ci.org/pjodouin/ansible-lambda)
 
 These modules help manage AWS Lambda resources including code, configuration, aliases, versions and event source mappings. A lookup plugin is also included which allows looking up values via a Lambda function.
 
 **Note:** This is a work in progress.  Refer to branch `lambda-crud-0.3` for current working version.
 
 ## Requirements
+- python >= 2.6
 - ansible >= 2.0
 - boto3 >= 1.2.3
 - importlib (only for running tests on < python 2.7)
@@ -123,6 +124,37 @@ Use to create, update or delete lambda function aliases.
     when: lambda_facts.Version != "$LATEST"
 
 ```
+
+### lambda_event:
+___
+Use to create, update or delete lambda function source event mappings.
+
+##### Example Playbook
+```yaml
+- hosts: localhost
+  gather_facts: no
+  vars:
+    state: present
+  tasks:
+  - name: S3 event mapping
+    lambda_event:
+      state: "{{ state | default('present') }}"
+      event_source: s3
+      function_name: ingestData
+      alias: Dev
+      source_params:
+        id: lambda-s3-myBucket-create-data-log
+        bucket: buzz-scanner
+        prefix: twitter
+        suffix: log
+        events:
+        - s3:ObjectCreated:Put
+
+  - name: show source event cnfig
+    debug: var=lambda_s3_events
+
+```
+
 
 ### lambda_invoke:
 ___

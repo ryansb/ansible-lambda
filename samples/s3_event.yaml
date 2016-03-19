@@ -1,0 +1,25 @@
+---
+- hosts: localhost
+  gather_facts: no
+  vars:
+    state: present
+  tasks:
+  - name: S3 event mapping
+    lambda_event:
+      state: "{{ state | default('present') }}"
+      event_source: s3
+      function_name: ingestData
+      alias: Dev
+      source_params:
+        id: lambda-s3-myBucket-create-data-log
+        bucket: buzz-scanner
+        prefix: twitter
+        suffix: log
+        events:
+        - s3:ObjectCreated:Put
+
+  - name: show source event cnfig
+    debug: var=lambda_s3_events
+
+
+
