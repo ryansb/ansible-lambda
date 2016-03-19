@@ -64,12 +64,19 @@ options:
   source_params:
     description:
       -  Sub-parameters required for event source.
-      -  "S3 event source:"
+      -  "S3 EVENT SOURCE:"
       -  C(id) Unique ID for this source event.
       -  C(bucket) Name of source bucket.
       -  C(prefix) Bucket prefix (e.g. images/)
       -  C(suffix) Bucket suffix (e.g. log)
-      -  C(events) List of events (e.g. ['s3:ObjectCreated:Put'])    
+      -  C(events) List of events (e.g. ['s3:ObjectCreated:Put'])
+      -  "STREAM EVENT SOURCE:"
+      -  C(source_arn) The Amazon Resource Name (ARN) of the Kinesis or DynamoDB stream that is the event source.
+      -  C(enabled) Indicates whether AWS Lambda should begin polling the event source. Default is True.
+      -  C(batch_size) The largest number of records that AWS Lambda will retrieve from your event source at the
+         time of invoking your function. Default is 100.
+      -  C(starting_position) The position in the stream where AWS Lambda should start reading.
+         Choices are TRIM_HORIZON or LATEST.
     required: true
 requirements:
     - boto3
@@ -80,7 +87,7 @@ extends_documentation_fragment:
 
 EXAMPLES = '''
 ---
-# Simple example to create a lambda event notification for an S3 bucket
+# Simple example that creates a lambda event notification for an S3 bucket
 - hosts: localhost
   gather_facts: no
   vars:
@@ -99,6 +106,27 @@ EXAMPLES = '''
         suffix: log
         events:
         - s3:ObjectCreated:Put
+
+# Simple example that creates a lambda event notification for a DynamoDB stream
+- hosts: localhost
+  gather_facts: no
+  vars:
+    state: present
+  tasks:
+  - name: DynamoDB stream event mapping
+    lambda_event:
+      state: "{{ state | default('present') }}"
+      event_source: stream
+      function_name: "{{ function_name }}"
+      alias: Dev
+      source_params:
+        source_arn: arn:aws:dynamodb:us-east-1:123456789012:table/tableName/stream/2016-03-19T19:51:37.457
+        enabled: True
+        batch_size: 100
+        starting_position: TRIM_HORIZON
+
+  - name: show source event
+    debug: var=lambda_stream_events
 
 '''
 
@@ -472,9 +500,89 @@ def remove_policy_permission(module, aws, statement_id):
 # ---------------------------------------------------------------------------------------------------
 
 
+def lambda_event_stream(module, aws):
+    """
+    Adds, updates or deletes lambda stream (DynamoDb, Kinesis) envent notifications.
+    :param module:
+    :param aws:
+    :return:
+    """
+
+    client = aws.client('lambda')
+    api_params = dict()
+    facts = dict()
+    changed = False
+    current_state = 'absent'
+    state = module.params['state']
+
+    # check if required sub-parameters are present and valid
+    source_params = module.params['source_params']
+
+    api_params = dict(FunctionName=module.params['lambda_function_arn'])
+
+    source_arn = source_params.get('source_arn')
+    if source_arn:
+        api_params.update(EventSourceArn=source_arn)
+    else:
+        module.fail_json(msg="Source parameter 'source_arn' is required for stream event notification.")
+
+    # check if event mapping exist
+    try:
+        facts = client.list_event_source_mappings(**api_params)
+        facts.pop('ResponseMetadata')
+        if facts.get('EventSourceMappings'):
+            current_state = 'present'
+    except ClientError, e:
+        module.fail_json(msg='Error retrieving stream event notification configuration: {0}'.format(e))
+
+    if state == 'present':
+        if current_state == 'absent':
+
+            starting_position = source_params.get('starting_position')
+            if starting_position:
+                api_params.update(StartingPosition=starting_position)
+            else:
+                module.fail_json(msg="Source parameter 'starting_position' is required for stream event notification.")
+
+            enabled = source_params.get('enabled')
+            if source_arn:
+                api_params.update(Enabled=enabled)
+            batch_size = source_params.get('batch_size')
+            if batch_size:
+                api_params.update(BatchSize=batch_size)
+
+            try:
+                if not module.check_mode:
+                    facts = client.create_event_source_mapping(**api_params)
+                changed = True
+            except (ClientError, ParamValidationError, MissingParametersError), e:
+                module.fail_json(msg='Error creating stream source event: {0}'.format(e))
+
+        else:
+            # current_state is 'present'
+            uuid = facts['EventSourceMappings'][0]['UUID']
+
+            api_params.update(EventSourceArn=uuid)
+            #TODO: Update logic
+
+    else:
+        if current_state == 'present':
+            # need to remove the stream event mapping
+            api_params = dict(UUID=facts['EventSourceMappings'][0]['UUID'])
+
+            try:
+                if not module.check_mode:
+                    facts = client.delete_event_source_mapping(**api_params)
+                changed = True
+            except (ClientError, ParamValidationError, MissingParametersError), e:
+                module.fail_json(msg='Error removing stream source event mapping: {0}'.format(e))
+
+    return dict(changed=changed, ansible_facts=dict(lambda_stream_events=facts))
+
+
 def lambda_event_s3(module, aws):
     """
-    Adds, updates or deletes lambda function aliases.
+    Adds, updates or deletes lambda s3 event notifications.
 
     :param module: Ansible module reference
     :param aws:
@@ -489,6 +597,7 @@ def lambda_event_s3(module, aws):
     current_state = 'absent'
     state = module.params['state']
 
+    # check if required sub-parameters are present
     source_params = module.params['source_params']
     if not source_params.get('id'):
         module.fail_json(msg="Source parameter 'id' is required for S3 event notification.")
@@ -573,7 +682,8 @@ def lambda_event_s3(module, aws):
             except (ClientError, ParamValidationError, MissingParametersError), e:
                 module.fail_json(msg='Error creating s3 event notification for lambda: {0}'.format(e))
 
-    else:  # state = 'absent'
+    else:
+        # state = 'absent'
         if current_state == 'present':
 
             # delete the lambda event notifications
