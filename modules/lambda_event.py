@@ -423,7 +423,8 @@ def add_policy_permission(module, aws, policy_statement):
         api_params.update(Qualifier=qualifier)
 
     try:
-        client.add_permission(**api_params)
+        if not module.check_mode:
+            client.add_permission(**api_params)
         changed = True
     except (ClientError, ParamValidationError, MissingParametersError), e:
         module.fail_json(msg='Error adding permission to policy: {0}'.format(e))
@@ -452,7 +453,8 @@ def remove_policy_permission(module, aws, statement_id):
         api_params.update(Qualifier=qualifier)
 
     try:
-        client.remove_permission(**api_params)
+        if not module.check_mode:
+            client.remove_permission(**api_params)
         changed = True
     except (ClientError, ParamValidationError, MissingParametersError), e:
         module.fail_json(msg='Error removing permission from policy: {0}'.format(e))
@@ -482,7 +484,7 @@ def lambda_event_s3(module, aws):
     s3_source_parameters = ('')
 
     client = aws.client('s3')
-    results = dict()
+    api_params = dict()
     changed = False
     current_state = 'absent'
     state = module.params['state']
@@ -542,7 +544,8 @@ def lambda_event_s3(module, aws):
                 api_params = dict(NotificationConfiguration=facts, Bucket=source_params['bucket'])
 
                 try:
-                    results = client.put_bucket_notification_configuration(**api_params)
+                    if not module.check_mode:
+                        client.put_bucket_notification_configuration(**api_params)
                     changed = True
                 except (ClientError, ParamValidationError, MissingParametersError), e:
                     module.fail_json(msg='Error updating s3 event notification for lambda: {0}'.format(e))
@@ -564,7 +567,8 @@ def lambda_event_s3(module, aws):
             api_params = dict(NotificationConfiguration=facts, Bucket=source_params['bucket'])
 
             try:
-                results = client.put_bucket_notification_configuration(**api_params)
+                if not module.check_mode:
+                    client.put_bucket_notification_configuration(**api_params)
                 changed = True
             except (ClientError, ParamValidationError, MissingParametersError), e:
                 module.fail_json(msg='Error creating s3 event notification for lambda: {0}'.format(e))
@@ -579,7 +583,8 @@ def lambda_event_s3(module, aws):
             api_params.update(NotificationConfiguration=facts)
 
             try:
-                results = client.put_bucket_notification_configuration(**api_params)
+                if not module.check_mode:
+                    client.put_bucket_notification_configuration(**api_params)
                 changed = True
             except (ClientError, ParamValidationError, MissingParametersError), e:
                 module.fail_json(msg='Error removing s3 source event configuration: {0}'.format(e))
