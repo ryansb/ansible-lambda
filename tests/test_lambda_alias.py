@@ -1,3 +1,5 @@
+from __future__ import (absolute_import, division, print_function)
+
 from nose.tools import assert_equals
 import yaml
 
@@ -6,7 +8,7 @@ from modules.lambda_alias import DOCUMENTATION, EXAMPLES
 
 
 def test_documentation_yaml():
-    print 'Testing documentation YAML...'
+    print('Testing documentation YAML...')
 
     assert_equals(DOCUMENTATION.startswith(('---', '\n---')), True)
 
@@ -19,5 +21,5 @@ def test_validate_yaml():
 
     example_yaml = yaml.load(EXAMPLES)
 
-    print documentation_yaml['short_description']
+    print(documentation_yaml['short_description'])
 
