@@ -19,7 +19,9 @@ DOCUMENTATION = '''
 module: lambda_invoke
 short_description: Invokes an AWS Lambda function 
 description:
-    - This module has a single purpose of triggering the execution of a specified lambda function. 
+    - This module has a single purpose of triggering the execution of a specified lambda function.
+      Use module M(lambda) to manage the lambda function itself, M(lambda_alias) to manage function aliases and
+      M(lambda_event) to manage event source mappings.
 version_added: "2.1"
 author: Pierre Jodouin (@pjodouin)
 options:

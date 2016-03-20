@@ -369,7 +369,7 @@
 </div>
 <div class="section" id="synopsis">
 <h2><a class="toc-backref" href="#id1">Synopsis</a><a class="headerlink" href="#synopsis" title="Permalink to this headline">¶</a></h2>
-<p>This module allows the management of AWS Lambda functions event source mappings via the Ansible framework.  It is idempotent and supports &#8220;Check&#8221; mode.</p>
+<p>This module allows the management of AWS Lambda function event source mappings such as S3 bucket events, DynamoDB and Kinesis streaming events via the Ansible framework. It is idempotent and supports &#8220;Check&#8221; mode.  Use module <a class="reference internal" href="lambda_module.html#lambda"><span>lambda</span></a> to manage the lambda function itself and <a class="reference internal" href="lambda_alias_module.html#lambda-alias"><span>lambda_alias</span></a> to manage function aliases.</p>
 </div>
 <div class="section" id="requirements">
 <h2><a class="toc-backref" href="#id2">Requirements</a><a class="headerlink" href="#requirements" title="Permalink to this headline">¶</a></h2>
@@ -448,7 +448,7 @@
 <td>yes</td>
 <td></td>
     <td><ul></ul></td>
-    <td><div>Sub-parameters required for event source.</div><div>S3 event source:</div><div><code>id</code> Unique ID for this source event.</div><div><code>bucket</code> Name of source bucket.</div><div><code>prefix</code> Bucket prefix (e.g. images/)</div><div><code>suffix</code> Bucket suffix (e.g. log)</div><div><code>events</code> List of events (e.g. ['s3:ObjectCreated:Put'])</div></td></tr>
+    <td><div>Sub-parameters required for event source.</div><div><em>"S3 EVENT SOURCE:"</em></div><div><code>id</code> Unique ID for this source event.</div><div><code>bucket</code> Name of source bucket.</div><div><code>prefix</code> Bucket prefix (e.g. images/)</div><div><code>suffix</code> Bucket suffix (e.g. log)</div><div><code>events</code> List of events (e.g. ['s3:ObjectCreated:Put'])</div><div><em>"STREAM EVENT SOURCE:"</em></div><div><code>source_arn</code> The Amazon Resource Name (ARN) of the Kinesis or DynamoDB stream that is the event source.</div><div><code>enabled</code> Indicates whether AWS Lambda should begin polling the event source. Default is True.</div><div><code>batch_size</code> The largest number of records that AWS Lambda will retrieve from your event source at the time of invoking your function. Default is 100.</div><div><code>starting_position</code> The position in the stream where AWS Lambda should start reading. Choices are TRIM_HORIZON or LATEST.</div></td></tr>
         <tr>
 <td>state<br/><div style="font-size: small;"></div></td>
 <td>yes</td>
@@ -473,7 +473,7 @@
 <h2><a class="toc-backref" href="#id4">Examples</a><a class="headerlink" href="#examples" title="Permalink to this headline">¶</a></h2>
 <blockquote>
 <div><div class="highlight-YAML"><div class="highlight"><pre><span></span><span class="nn">---</span>
-<span class="c1"># Simple example to create a lambda event notification for an S3 bucket</span>
+<span class="c1"># Simple example that creates a lambda event notification for an S3 bucket</span>
 <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">hosts</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">localhost</span>
   <span class="l l-Scalar l-Scalar-Plain">gather_facts</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">no</span>
   <span class="l l-Scalar l-Scalar-Plain">vars</span><span class="p p-Indicator">:</span>
@@ -492,6 +492,27 @@
         <span class="l l-Scalar l-Scalar-Plain">suffix</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">log</span>
         <span class="l l-Scalar l-Scalar-Plain">events</span><span class="p p-Indicator">:</span>
         <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">s3:ObjectCreated:Put</span>
+
+<span class="c1"># Simple example that creates a lambda event notification for a DynamoDB stream</span>
+<span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">hosts</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">localhost</span>
+  <span class="l l-Scalar l-Scalar-Plain">gather_facts</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">no</span>
+  <span class="l l-Scalar l-Scalar-Plain">vars</span><span class="p p-Indicator">:</span>
+    <span class="l l-Scalar l-Scalar-Plain">state</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">present</span>
+  <span class="l l-Scalar l-Scalar-Plain">tasks</span><span class="p p-Indicator">:</span>
+  <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">name</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">DynamoDB stream event mapping</span>
+    <span class="l l-Scalar l-Scalar-Plain">lambda_event</span><span class="p p-Indicator">:</span>
+      <span class="l l-Scalar l-Scalar-Plain">state</span><span class="p p-Indicator">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">state</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">default(&#39;present&#39;)</span><span class="nv"> </span><span class="s">}}&quot;</span>
+      <span class="l l-Scalar l-Scalar-Plain">event_source</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">stream</span>
+      <span class="l l-Scalar l-Scalar-Plain">function_name</span><span class="p p-Indicator">:</span> <span class="s">&quot;{{</span><span class="nv"> </span><span class="s">function_name</span><span class="nv"> </span><span class="s">}}&quot;</span>
+      <span class="l l-Scalar l-Scalar-Plain">alias</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">Dev</span>
+      <span class="l l-Scalar l-Scalar-Plain">source_params</span><span class="p p-Indicator">:</span>
+        <span class="l l-Scalar l-Scalar-Plain">source_arn</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">arn:aws:dynamodb:us-east-1:123456789012:table/tableName/stream/2016-03-19T19:51:37.457</span>
+        <span class="l l-Scalar l-Scalar-Plain">enabled</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">True</span>
+        <span class="l l-Scalar l-Scalar-Plain">batch_size</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">100</span>
+        <span class="l l-Scalar l-Scalar-Plain">starting_position</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">TRIM_HORIZON</span>
+
+  <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">name</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">show source event</span>
+    <span class="l l-Scalar l-Scalar-Plain">debug</span><span class="p p-Indicator">:</span> <span class="l l-Scalar l-Scalar-Plain">var=lambda_stream_events</span>
 </pre></div>
 </div>
 </div></blockquote>
@@ -537,7 +558,7 @@
 
   <p>
   &copy; Copyright 2016 <a href="http://ansible.com">Ansible, Inc.</a>.
-    Last updated on Mar 19, 2016.
+    Last updated on Mar 20, 2016.
   </p>
 
 Ansible docs are generated from <a href="https://github.com/ansible/ansible">GitHub sources</A> using <A HREF="http://sphinx-doc.org/">Sphinx</A> using a theme provided by <a href="http://readthedocs.org">Read the Docs</a>. . Module documentation is not edited directly, but is generated from the source code for the modules.  To submit an update to module docs, edit the 'DOCUMENTATION' metadata in the <A HREF="https://github.com/ansible/ansible-modules-core">core</A> and <A HREF="https://github.com/ansible/ansible-modules-extras">extras</A> modules source repositories. 
