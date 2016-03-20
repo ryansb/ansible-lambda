@@ -438,7 +438,7 @@ def lambda_function(module):
                     if not module.check_mode:
                         results = client.publish_version(**api_params)
                     changed = True
-                except (ClientError, ParamValidationError, MissingParametersError),  ase:
+                except (ClientError, ParamValidationError, MissingParametersError) as e:
                     module.fail_json(msg='Error publishing version: {0}'.format(e))
 
         else:  # create function

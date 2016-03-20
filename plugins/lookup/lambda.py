@@ -42,9 +42,9 @@ def invoke_function(client, args):
     # execute lambda function
     try:
         results = client.invoke(**api_params)
-    except ClientError, e:
+    except ClientError as e:
         raise AnsibleError('Error invoking lambda function {0}: {1}'.format(args[0], e))
-    except EndpointConnectionError, e:
+    except EndpointConnectionError as e:
         raise AnsibleError('Lambda function {0} not found: {1}'.format(args[0], e))
 
     # The returned Payload is a botocore StreamingBody object. Read all content and convert to JSON.
@@ -69,9 +69,9 @@ class LookupModule(LookupBase):
 
         try:
             client = boto3.client('lambda')
-        except ClientError, e:
+        except ClientError as e:
             raise AnsibleError("Can't authorize connection - {0}".format(e))
-        except EndpointConnectionError, e:
+        except EndpointConnectionError as e:
             raise AnsibleError("Connection Error - {0}".format(e))
 
         response = [invoke_function(client, args)]
