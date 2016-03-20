@@ -3,7 +3,6 @@
 
 These modules help manage AWS Lambda resources including code, configuration, aliases, versions and event source mappings. A lookup plugin is also included which allows looking up values via a Lambda function.
 
-**Note:** This is a work in progress.  Refer to branch `lambda-crud-0.3` for current working version.
 
 ## Requirements
 - python >= 2.6
@@ -150,8 +149,23 @@ Use to create, update or delete lambda function source event mappings.
         events:
         - s3:ObjectCreated:Put
 
-  - name: show source event cnfig
+  - name: show source event config
     debug: var=lambda_s3_events
+
+  - name: DynamoDB stream event mapping
+    lambda_event:
+      state: "{{ state | default('present') }}"
+      event_source: stream
+      function_name: "{{ function_name }}"
+      alias: Dev
+      source_params:
+        source_arn: arn:aws:dynamodb:us-east-1:123456789012:table/tableName/stream/2016-03-19T19:51:37.457
+        enabled: True
+        batch_size: 120
+        starting_position: TRIM_HORIZON
+
+  - name: show source event config
+    debug: var=lambda_stream_events
 
 ```
 
