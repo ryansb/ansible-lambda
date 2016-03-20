@@ -20,7 +20,7 @@ module: lambda_invoke
 short_description: Invokes an AWS Lambda function 
 description:
     - This module has a single purpose of triggering the execution of a specified lambda function. 
-version_added: "2.0"
+version_added: "2.1"
 author: Pierre Jodouin (@pjodouin)
 options:
   function_name:
@@ -73,7 +73,11 @@ options:
       - JSON that you want to provide to your Lambda function as input. 
     required: false
     default: none  
-extends_documentation_fragment: aws
+requirements:
+    - boto3
+extends_documentation_fragment:
+    - aws
+
 '''
 
 EXAMPLES = '''

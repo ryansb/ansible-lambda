@@ -30,7 +30,8 @@ module: lambda_facts
 short_description: Gathers AWS Lambda function details as Ansible facts 
 description:
   - Gathers various details related to Lambda functions, including aliases, versions and event source mappings.
-version_added: "2.0"
+    Use module M(lambda) to manage the lambda function itself and M(lambda_alias) to manage function aliases.
+version_added: "2.1"
 options:
   query:
     description:
@@ -45,7 +46,11 @@ options:
     default: null
     aliases: [ "function"]
 author: Pierre Jodouin (@pjodouin)
-extends_documentation_fragment: aws
+requirements:
+    - boto3
+extends_documentation_fragment:
+    - aws
+
 '''
 
 EXAMPLES = '''

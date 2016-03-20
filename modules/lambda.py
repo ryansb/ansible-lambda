@@ -35,8 +35,10 @@ module: lambda
 short_description: Creates, updates or deletes AWS Lambda functions, configs and versions.
 description:
     - This module allows the management of AWS Lambda functions and their related resources via the Ansible
-      framework.  It is idempotent and supports "Check" mode.
-version_added: "2.0"
+      framework.  It is idempotent and supports "Check" mode. Use M(lambda_alias) to manage lambda function aliases,
+      M(lambda_event) to manage event source mappings such as S3 bucket events or Kinesis streams, M(lambda_invoke)
+      to execute a lambda function and M(lambda_facts) to gather facts relating to one or more lambda functions.
+version_added: "2.1"
 author: Pierre Jodouin (@pjodouin)
 options:
   name:
@@ -130,6 +132,10 @@ options:
          security group IDs. You must provide at least one security group ID.
     required: false
     aliases: ['security_group_ids']
+requirements:
+    - boto3
+extends_documentation_fragment:
+    - aws
 
 '''
 

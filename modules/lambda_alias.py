@@ -29,8 +29,9 @@ module: lambda_alias
 short_description: Creates, updates or deletes AWS Lambda function aliases.
 description:
     - This module allows the management of AWS Lambda functions aliases via the Ansible
-      framework.  It is idempotent and supports "Check" mode.
-version_added: "2.0"
+      framework.  It is idempotent and supports "Check" mode.    Use module M(lambda) to manage the lambda function
+      itself and M(lambda_event) to manage event source mappings.
+version_added: "2.1"
 author: Pierre Jodouin (@pjodouin)
 options:
   function_name:
@@ -58,6 +59,10 @@ options:
          A value of 0 (or missing parameter) sets the alias to the $LATEST version.
     required: false
     aliases: ['function_version']
+requirements:
+    - boto3
+extends_documentation_fragment:
+    - aws
 
 '''
 
