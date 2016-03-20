@@ -194,7 +194,7 @@ def aws_client(module, resource='lambda'):
                                        ))
         client = boto3_conn(module, **aws_connect_kwargs)
 
-    except ClientError, e:
+    except ClientError as e:
         module.fail_json(msg="Can't authorize connection - {0}".format(e))
 
     return client
@@ -302,7 +302,7 @@ def upload_to_s3(module):
 
     try:
         s3.upload_file(local_path, s3_bucket, s3_key)
-    except Exception, e:
+    except Exception as e:
         module.fail_json(msg='Error uploading package to s3: {0}'.format(e))
 
     return
@@ -348,7 +348,7 @@ def get_lambda_config(module):
     try:
         results = client.get_function_configuration(**api_params)
 
-    except ClientError, e:
+    except ClientError as e:
         if e.response['Error']['Code'] == 'ResourceNotFoundException':
             results = None
         else:
@@ -361,7 +361,6 @@ def lambda_function(module):
     """
     Adds, updates or deletes lambda function code and configuration.
 
-    :param client: AWS API client reference (boto3)
     :param module: Ansible module reference
     :return dict:
     """
@@ -394,7 +393,7 @@ def lambda_function(module):
                     if not module.check_mode:
                         results = client.update_function_code(**api_params)
                     changed = True
-                except ClientError, e:
+                except ClientError as e:
                     module.fail_json(msg='Error updating function code: {0}'.format(e))
 
             # check if config has changed
@@ -428,7 +427,7 @@ def lambda_function(module):
                     if not module.check_mode:
                         results = client.update_function_configuration(**api_params)
                     changed = True
-                except (ClientError, ParamValidationError, MissingParametersError), e:
+                except (ClientError, ParamValidationError, MissingParametersError) as e:
                     module.fail_json(msg='Error updating function config: {0}'.format(e))
 
             # check if function needs to be published
@@ -439,7 +438,7 @@ def lambda_function(module):
                     if not module.check_mode:
                         results = client.publish_version(**api_params)
                     changed = True
-                except (ClientError, ParamValidationError, MissingParametersError), e:
+                except (ClientError, ParamValidationError, MissingParametersError),  ase:
                     module.fail_json(msg='Error publishing version: {0}'.format(e))
 
         else:  # create function
@@ -455,7 +454,7 @@ def lambda_function(module):
                 if not module.check_mode:
                     results = client.create_function(**api_params)
                 changed = True
-            except ClientError, e:
+            except ClientError as e:
                 module.fail_json(msg='Error creating: {0}'.format(e))
 
     else:  # state = 'absent'
@@ -471,7 +470,7 @@ def lambda_function(module):
                 if not module.check_mode:
                     results = client.delete_function(**api_params)
                 changed = True
-            except ClientError, e:
+            except ClientError as e:
                 module.fail_json(msg='Error deleting function: {0}'.format(e))
 
     return dict(changed=changed, ansible_facts=dict(lambda_facts=results or facts))

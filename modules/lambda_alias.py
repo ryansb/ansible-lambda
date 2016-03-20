@@ -144,7 +144,7 @@ def aws_client(module, resource='lambda'):
                                        ))
         client = boto3_conn(module, **aws_connect_kwargs)
 
-    except (ClientError, ParamValidationError, MissingParametersError), e:
+    except (ClientError, ParamValidationError, MissingParametersError) as e:
         module.fail_json(msg="Can't authorize connection - {0}".format(e))
 
     return client
@@ -242,7 +242,7 @@ def get_lambda_alias(module):
     try:
         results = client.get_alias(**api_params)
 
-    except (ClientError, ParamValidationError, MissingParametersError), e:
+    except (ClientError, ParamValidationError, MissingParametersError) as e:
         if e.response['Error']['Code'] == 'ResourceNotFoundException':
             results = None
         else:
@@ -285,7 +285,7 @@ def lambda_alias(module):
                 if not module.check_mode:
                     try:
                         results = client.update_alias(**api_params)
-                    except (ClientError, ParamValidationError, MissingParametersError), e:
+                    except (ClientError, ParamValidationError, MissingParametersError) as e:
                         module.fail_json(msg='Error updating function alias: {0}'.format(e))
 
         else:
@@ -296,7 +296,7 @@ def lambda_alias(module):
                 if not module.check_mode:
                     results = client.create_alias(**api_params)
                 changed = True
-            except (ClientError, ParamValidationError, MissingParametersError), e:
+            except (ClientError, ParamValidationError, MissingParametersError) as e:
                 module.fail_json(msg='Error creating function alias: {0}'.format(e))
 
     else:  # state = 'absent'
@@ -308,7 +308,7 @@ def lambda_alias(module):
                 if not module.check_mode:
                     results = client.delete_alias(**api_params)
                 changed = True
-            except (ClientError, ParamValidationError, MissingParametersError), e:
+            except (ClientError, ParamValidationError, MissingParametersError) as e:
                 module.fail_json(msg='Error deleting function alias: {0}'.format(e))
 
     return dict(changed=changed, ansible_facts=dict(lambda_alias_facts=results or facts))

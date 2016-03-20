@@ -167,7 +167,7 @@ class AWSConnection:
             if not self.region:
                 self.region = self.resource_client['iam'].meta.region_name
 
-        except (ClientError, ParamValidationError, MissingParametersError), e:
+        except (ClientError, ParamValidationError, MissingParametersError) as e:
             ansible_obj.fail_json(msg="Unable to connect, authorize or access resource: {0}".format(e))
 
         try:
@@ -323,7 +323,7 @@ def get_policy_state(module, aws, sid):
         policy_results = client.get_policy(**api_params)
         policy = json.loads(policy_results.get('Policy', '{}'))
 
-    except (ClientError, ParamValidationError, MissingParametersError), e:
+    except (ClientError, ParamValidationError, MissingParametersError) as e:
         if not e.response['Error']['Code'] == 'ResourceNotFoundException':
             module.fail_json(msg='Error retrieving function policy: {0}'.format(e))
 
@@ -361,7 +361,7 @@ def add_policy_permission(module, aws, policy_statement):
         if not module.check_mode:
             client.add_permission(**api_params)
         changed = True
-    except (ClientError, ParamValidationError, MissingParametersError), e:
+    except (ClientError, ParamValidationError, MissingParametersError) as e:
         module.fail_json(msg='Error adding permission to policy: {0}'.format(e))
 
     return changed
@@ -391,7 +391,7 @@ def remove_policy_permission(module, aws, statement_id):
         if not module.check_mode:
             client.remove_permission(**api_params)
         changed = True
-    except (ClientError, ParamValidationError, MissingParametersError), e:
+    except (ClientError, ParamValidationError, MissingParametersError) as e:
         module.fail_json(msg='Error removing permission from policy: {0}'.format(e))
 
     return changed
@@ -451,7 +451,7 @@ def lambda_event_stream(module, aws):
         facts.pop('ResponseMetadata')
         if facts.get('EventSourceMappings'):
             current_state = 'present'
-    except ClientError, e:
+    except ClientError as e:
         module.fail_json(msg='Error retrieving stream event notification configuration: {0}'.format(e))
 
     if state == 'present':
@@ -474,7 +474,7 @@ def lambda_event_stream(module, aws):
                 if not module.check_mode:
                     facts = client.create_event_source_mapping(**api_params)
                 changed = True
-            except (ClientError, ParamValidationError, MissingParametersError), e:
+            except (ClientError, ParamValidationError, MissingParametersError) as e:
                 module.fail_json(msg='Error creating stream source event mapping: {0}'.format(e))
 
         else:
@@ -504,7 +504,7 @@ def lambda_event_stream(module, aws):
                     if not module.check_mode:
                         facts = client.update_event_source_mapping(**api_params)
                     changed = True
-                except (ClientError, ParamValidationError, MissingParametersError), e:
+                except (ClientError, ParamValidationError, MissingParametersError) as e:
                     module.fail_json(msg='Error updating stream source event mapping: {0}'.format(e))
 
     else:
@@ -516,7 +516,7 @@ def lambda_event_stream(module, aws):
                 if not module.check_mode:
                     facts = client.delete_event_source_mapping(**api_params)
                 changed = True
-            except (ClientError, ParamValidationError, MissingParametersError), e:
+            except (ClientError, ParamValidationError, MissingParametersError) as e:
                 module.fail_json(msg='Error removing stream source event mapping: {0}'.format(e))
 
     return dict(changed=changed, ansible_facts=dict(lambda_stream_events=facts))
@@ -553,7 +553,7 @@ def lambda_event_s3(module, aws):
     try:
         facts = client.get_bucket_notification_configuration(**api_params)
         facts.pop('ResponseMetadata')
-    except ClientError, e:
+    except ClientError as e:
         module.fail_json(msg='Error retrieving s3 event notification configuration: {0}'.format(e))
 
     current_lambda_configs = list()
@@ -598,7 +598,7 @@ def lambda_event_s3(module, aws):
                     if not module.check_mode:
                         client.put_bucket_notification_configuration(**api_params)
                     changed = True
-                except (ClientError, ParamValidationError, MissingParametersError), e:
+                except (ClientError, ParamValidationError, MissingParametersError) as e:
                     module.fail_json(msg='Error updating s3 event notification for lambda: {0}'.format(e))
 
         else:
@@ -621,7 +621,7 @@ def lambda_event_s3(module, aws):
                 if not module.check_mode:
                     client.put_bucket_notification_configuration(**api_params)
                 changed = True
-            except (ClientError, ParamValidationError, MissingParametersError), e:
+            except (ClientError, ParamValidationError, MissingParametersError) as e:
                 module.fail_json(msg='Error creating s3 event notification for lambda: {0}'.format(e))
 
     else:
@@ -638,7 +638,7 @@ def lambda_event_s3(module, aws):
                 if not module.check_mode:
                     client.put_bucket_notification_configuration(**api_params)
                 changed = True
-            except (ClientError, ParamValidationError, MissingParametersError), e:
+            except (ClientError, ParamValidationError, MissingParametersError) as e:
                 module.fail_json(msg='Error removing s3 source event configuration: {0}'.format(e))
 
             policy = dict(

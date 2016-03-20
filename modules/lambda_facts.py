@@ -122,7 +122,7 @@ def alias_details(client, module):
             params['Marker'] = module.params.get('next_marker')
         try:
             lambda_facts.update(client.list_aliases(FunctionName=function_name, **params))
-        except ClientError, e:
+        except ClientError as e:
             module.fail_json(msg='Unable to get {0} aliases, error: {1}'.format(function_name, e))
     else:
         module.fail_json(msg='Parameter function_name required for query=aliases.')
@@ -172,7 +172,7 @@ def config_details(client, module):
     if function_name:
         try:
             lambda_facts.update(client.get_function_configuration(FunctionName=function_name))
-        except ClientError, e:
+        except ClientError as e:
             module.fail_json(msg='Unable to get {0} configuration, error: {1}'.format(function_name, e))
     else:
         params = dict()
@@ -184,7 +184,7 @@ def config_details(client, module):
 
         try:
             lambda_facts.update(client.list_functions(**params))
-        except ClientError, e:
+        except ClientError as e:
             module.fail_json(msg='Unable to get function list, error: {0}'.format(e))
 
     return lambda_facts
@@ -216,7 +216,7 @@ def mapping_details(client, module):
 
     try:
         lambda_facts.update(client.list_event_source_mappings(**params))
-    except ClientError, e:
+    except ClientError as e:
         module.fail_json(msg='Unable to get source event mappings, error: {0}'.format(e))
 
     return lambda_facts
@@ -241,7 +241,7 @@ def policy_details(client, module):
         try:
             # get_policy returns a JSON string so must convert to dict before reassigning to its key
             lambda_facts.update(Policy=json.loads(client.get_policy(FunctionName=function_name)['Policy']))
-        except ClientError, e:
+        except ClientError as e:
             if e.response['Error']['Code'] == 'ResourceNotFoundException':
                 lambda_facts.update(Policy=dict())
             else:
@@ -274,7 +274,7 @@ def version_details(client, module):
 
         try:
             lambda_facts.update(client.list_versions_by_function(FunctionName=function_name, **params))
-        except ClientError, e:
+        except ClientError as e:
             module.fail_json(msg='Unable to get {0} versions, error: {1}'.format(function_name, e))
     else:
         module.fail_json(msg='Parameter function_name required for query=versions.')
@@ -325,7 +325,7 @@ def main():
                                        resource='lambda'
                                        ))
         client = boto3_conn(module, **aws_connect_kwargs)
-    except ClientError, e:
+    except ClientError as e:
         module.fail_json(msg="Can't authorize connection - {0}".format(e))
 
     invocations = {

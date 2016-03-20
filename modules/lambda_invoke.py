@@ -174,9 +174,9 @@ def invoke_function(client, module):
     # execute lambda function 
     try:
         results = client.invoke(**api_params)
-    except ClientError, e:
+    except ClientError as e:
         module.fail_json(msg='Error invoking function {0}: {1}'.format(module.params['function_name'], e))
-    except EndpointConnectionError, e:
+    except EndpointConnectionError as e:
         module.fail_json(msg='Lambda function not found: {0}'.format(e))
 
     # The returned Payload is a botocore StreamingBody object. Read all content and convert to JSON.
@@ -232,9 +232,9 @@ def main():
                                        resource='lambda'
                                        ))
         client = boto3_conn(module, **aws_connect_kwargs)
-    except ClientError, e:
+    except ClientError as e:
         module.fail_json(msg="Can't authorize connection - {0}".format(e))
-    except EndpointConnectionError, e:
+    except EndpointConnectionError as e:
         module.fail_json(msg="Connection Error - {0}".format(e))
 
     response = invoke_function(client, module)
