@@ -32,8 +32,10 @@ DOCUMENTATION = '''
 module: lambda_event
 short_description: Creates, updates or deletes AWS Lambda function event mappings.
 description:
-    - This module allows the management of AWS Lambda functions event source mappings via the Ansible
-      framework.  It is idempotent and supports "Check" mode.
+    - This module allows the management of AWS Lambda function event source mappings such as S3 bucket
+      events, DynamoDB and Kinesis streaming events via the Ansible framework.
+      It is idempotent and supports "Check" mode.  Use module M(lambda) to manage the lambda
+      function itself and M(lambda_alias) to manage function aliases.
 version_added: "2.1"
 author: Pierre Jodouin (@pjodouin)
 options:
@@ -64,13 +66,13 @@ options:
   source_params:
     description:
       -  Sub-parameters required for event source.
-      -  "S3 EVENT SOURCE:"
+      -  I("S3 EVENT SOURCE:")
       -  C(id) Unique ID for this source event.
       -  C(bucket) Name of source bucket.
       -  C(prefix) Bucket prefix (e.g. images/)
       -  C(suffix) Bucket suffix (e.g. log)
       -  C(events) List of events (e.g. ['s3:ObjectCreated:Put'])
-      -  "STREAM EVENT SOURCE:"
+      -  I("STREAM EVENT SOURCE:")
       -  C(source_arn) The Amazon Resource Name (ARN) of the Kinesis or DynamoDB stream that is the event source.
       -  C(enabled) Indicates whether AWS Lambda should begin polling the event source. Default is True.
       -  C(batch_size) The largest number of records that AWS Lambda will retrieve from your event source at the
@@ -204,26 +206,7 @@ def ordered_obj(obj):
         return obj
 
 
-def set_api_params(module, module_params):
-    """
-    Sets module parameters to those expected by the boto3 API.
-
-    :param module:
-    :param module_params:
-    :return:
-    """
-
-    api_params = dict()
-
-    for param in module_params:
-        param_value = module.params.get(param, None)
-        if param_value:
-            api_params[pc(param)] = param_value
-
-    return api_params
-
-
-def set_api_sub_params(module_params):
+def set_api_sub_params(params):
     """
     Sets module sub-parameters to those expected by the boto3 API.
 
@@ -233,8 +216,8 @@ def set_api_sub_params(module_params):
 
     api_params = dict()
 
-    for param in module_params.keys():
-        param_value = module_params.get(param, None)
+    for param in params.keys():
+        param_value = params.get(param, None)
         if param_value:
             api_params[pc(param)] = param_value
 
@@ -273,33 +256,6 @@ def validate_params(module, aws):
     return
 
 
-def get_lambda_alias(module, aws):
-    """
-    Returns the lambda function alias if it exists.
-
-    :param module:
-    :param aws:
-    :return:
-    """
-
-    client = aws.client('lambda')
-
-    # set API parameters
-    api_params = set_api_params(module, ('function_name', 'name'))
-
-    # check if alias exists and get facts
-    try:
-        results = client.get_alias(**api_params)
-
-    except (ClientError, ParamValidationError, MissingParametersError), e:
-        if e.response['Error']['Code'] == 'ResourceNotFoundException':
-            results = None
-        else:
-            module.fail_json(msg='Error retrieving function alias: {0}'.format(e))
-
-    return results
-
-
 def get_qualifier(module):
     """
     Returns the function qualifier as a version or alias or None.
@@ -315,55 +271,6 @@ def get_qualifier(module):
         qualifier = str(module.params['alias'])
 
     return qualifier
-
-
-def get_lambda_config(module, aws):
-    """
-    Returns the lambda function configuration if it exists.
-
-    :param module:
-    :param aws:
-    :return:
-    """
-
-    client = aws.client('lambda')
-
-    # set API parameters
-    api_params = dict(FunctionName=module.params['lambda_function_arn'])
-    api_params.update(Qualifier=get_qualifier(module))
-
-    # check if function exists and get facts, including sha256 hash
-    try:
-        results = client.get_function_configuration(**api_params)
-
-    except ClientError, e:
-        if e.response['Error']['Code'] == 'ResourceNotFoundException':
-            results = None
-        else:
-            module.fail_json(msg='Error retrieving function configuration: {0}'.format(e))
-
-    return results
-
-
-def build_id(module):
-    """
-    Build a unique ID based on source type parameters.
-
-    :param module:
-    :return:
-    """
-
-    build_list = [module.params['event_source']]
-    source_params = module.params['source_params']
-
-    for parm in source_params.keys():
-        parm_value = source_params.get(parm, None)
-        if parm_value:
-            if isinstance(parm_value, list):
-                parm_value = "".join(parm_value)
-            build_list.append(parm_value)
-
-    return "-".join(build_list)
 
 
 def assert_policy_state(module, aws, policy, present=False):
@@ -509,22 +416,34 @@ def lambda_event_stream(module, aws):
     """
 
     client = aws.client('lambda')
-    api_params = dict()
     facts = dict()
     changed = False
     current_state = 'absent'
     state = module.params['state']
 
+    api_params = dict(FunctionName=module.params['lambda_function_arn'])
+
     # check if required sub-parameters are present and valid
     source_params = module.params['source_params']
-
-    api_params = dict(FunctionName=module.params['lambda_function_arn'])
 
     source_arn = source_params.get('source_arn')
     if source_arn:
         api_params.update(EventSourceArn=source_arn)
     else:
         module.fail_json(msg="Source parameter 'source_arn' is required for stream event notification.")
+
+    # check if optional sub-parameters are valid, if present
+    batch_size = source_params.get('batch_size')
+    if batch_size:
+        try:
+            source_params['batch_size'] = int(batch_size)
+        except ValueError:
+            module.fail_json(msg="Source parameter 'batch_size' must be an integer, found: {0}".format(source_params['batch_size']))
+
+    # optional boolean value needs special treatment as not present does not imply False
+    source_param_enabled = None
+    if source_params.get('enabled') is not None:
+        source_param_enabled = module.boolean(source_params['enabled'])
 
     # check if event mapping exist
     try:
@@ -556,18 +475,41 @@ def lambda_event_stream(module, aws):
                     facts = client.create_event_source_mapping(**api_params)
                 changed = True
             except (ClientError, ParamValidationError, MissingParametersError), e:
-                module.fail_json(msg='Error creating stream source event: {0}'.format(e))
+                module.fail_json(msg='Error creating stream source event mapping: {0}'.format(e))
 
         else:
             # current_state is 'present'
-            uuid = facts['EventSourceMappings'][0]['UUID']
+            api_params = dict(FunctionName=module.params['lambda_function_arn'])
+            current_mapping = facts['EventSourceMappings'][0]
+            api_params.update(UUID=current_mapping['UUID'])
+            mapping_changed = False
 
-            api_params.update(EventSourceArn=uuid)
-            #TODO: Update logic
+            # check if anything changed
+            if source_params.get('batch_size') and source_params['batch_size'] != current_mapping['BatchSize']:
+                api_params.update(BatchSize=source_params['batch_size'])
+                mapping_changed = True
+
+            if source_param_enabled is not None:
+                if source_param_enabled:
+                    if current_mapping['State'] not in ('Enabled', 'Enabling'):
+                        api_params.update(Enabled=True)
+                        mapping_changed = True
+                else:
+                    if current_mapping['State'] not in ('Disabled', 'Disabling'):
+                        api_params.update(Enabled=False)
+                        mapping_changed = True
+
+            if mapping_changed:
+                try:
+                    if not module.check_mode:
+                        facts = client.update_event_source_mapping(**api_params)
+                    changed = True
+                except (ClientError, ParamValidationError, MissingParametersError), e:
+                    module.fail_json(msg='Error updating stream source event mapping: {0}'.format(e))
 
     else:
         if current_state == 'present':
-            # need to remove the stream event mapping
+            # remove the stream event mapping
             api_params = dict(UUID=facts['EventSourceMappings'][0]['UUID'])
 
             try:
