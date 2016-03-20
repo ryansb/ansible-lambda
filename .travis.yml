@@ -2,10 +2,12 @@ language: python
 python:
   - "2.7"
   - "2.6"
+  - "3.5"
 install:
   # Build/test dependencies
   - pip install -r requirements.txt
 script:
 - python -m compileall modules/*.py
+- python -m compileall plugins/lookup/*.py
 - nosetests
 
