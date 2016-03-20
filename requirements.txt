@@ -1,4 +1,4 @@
 boto3
 boto
 ansible
-importlib
+importlib; python_version < '2.7'
