@@ -128,7 +128,7 @@ def alias_details(client, module):
         if module.params.get('next_marker'):
             params['Marker'] = module.params.get('next_marker')
         try:
-            lambda_facts.update(client.list_aliases(FunctionName=function_name, **params))
+            lambda_facts.update(aliases=client.list_aliases(FunctionName=function_name, **params)['Aliases'])
         except ClientError as e:
             if e.response['Error']['Code'] == 'ResourceNotFoundException':
                 lambda_facts['msg'] = 'No aliases found.'
@@ -160,9 +160,9 @@ def all_details(client, module):
         lambda_facts.update(alias_details(client, module))
         lambda_facts.update(policy_details(client, module))
         lambda_facts.update(version_details(client, module))
+        lambda_facts.update(mapping_details(client, module))
     else:
         lambda_facts.update(config_details(client, module))
-        lambda_facts.update(mapping_details(client, module))
 
     return lambda_facts
 
@@ -181,7 +181,7 @@ def config_details(client, module):
     function_name = module.params.get('function_name')
     if function_name:
         try:
-            lambda_facts.update(client.get_function_configuration(FunctionName=function_name))
+            lambda_facts.update(function=client.get_function_configuration(FunctionName=function_name))
         except ClientError as e:
             if e.response['Error']['Code'] == 'ResourceNotFoundException':
                 lambda_facts['msg'] = 'No lambda function found.'
@@ -196,7 +196,7 @@ def config_details(client, module):
             params['Marker'] = module.params.get('next_marker')
 
         try:
-            lambda_facts.update(client.list_functions(**params))
+            lambda_facts.update(function_list=client.list_functions(**params))
         except ClientError as e:
             if e.response['Error']['Code'] == 'ResourceNotFoundException':
                 lambda_facts['msg'] = 'No lambda functions found.'
@@ -231,7 +231,7 @@ def mapping_details(client, module):
         params['Marker'] = module.params.get('next_marker')
 
     try:
-        lambda_facts.update(client.list_event_source_mappings(**params))
+        lambda_facts.update(mappings=client.list_event_source_mappings(**params)['EventSourceMappings'])
     except ClientError as e:
         if e.response['Error']['Code'] == 'ResourceNotFoundException':
             lambda_facts['msg'] = 'No mappings found.'
@@ -259,7 +259,7 @@ def policy_details(client, module):
     if function_name:
         try:
             # get_policy returns a JSON string so must convert to dict before reassigning to its key
-            lambda_facts.update(Policy=json.loads(client.get_policy(FunctionName=function_name)['Policy']))
+            lambda_facts.update(policy=json.loads(client.get_policy(FunctionName=function_name)['Policy']))
         except ClientError as e:
             if e.response['Error']['Code'] == 'ResourceNotFoundException':
                 lambda_facts['msg'] = 'No policy found.'
@@ -292,7 +292,7 @@ def version_details(client, module):
             params['Marker'] = module.params.get('next_marker')
 
         try:
-            lambda_facts = client.list_versions_by_function(FunctionName=function_name, **params)
+            lambda_facts.update(versions=client.list_versions_by_function(FunctionName=function_name, **params)['Versions'])
         except ClientError as e:
             if e.response['Error']['Code'] == 'ResourceNotFoundException':
                 lambda_facts['msg'] = 'No versions found.'
@@ -362,9 +362,9 @@ def main():
     )
 
     this_module_function = getattr(this_module, invocations[module.params['query']])
-    lambda_facts = fix_return(this_module_function(client, module))
+    all_facts = fix_return(this_module_function(client, module))
 
-    results = dict(ansible_facts=lambda_facts, changed=False)
+    results = dict(ansible_facts=dict(lambda_facts=all_facts), changed=False)
 
     if module.check_mode:
         results.update(dict(msg='Check mode set but ignored for fact gathering only.'))
