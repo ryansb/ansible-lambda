@@ -132,6 +132,17 @@ EXAMPLES = '''
 
 '''
 
+RETURN = '''
+lambda_s3_events:
+    description: list of dictionaries returned by the API describing S3 event mappings
+    returned: success
+    type: list
+lambda_stream_events:
+    description: list of dictionaries returned by the API describing stream event mappings
+    returned: success
+    type: list
+'''
+
 # ---------------------------------------------------------------------------------------------------
 #
 #   Helper Functions & classes
@@ -447,9 +458,8 @@ def lambda_event_stream(module, aws):
 
     # check if event mapping exist
     try:
-        facts = client.list_event_source_mappings(**api_params)
-        facts.pop('ResponseMetadata')
-        if facts.get('EventSourceMappings'):
+        facts = client.list_event_source_mappings(**api_params)['EventSourceMappings']
+        if facts:
             current_state = 'present'
     except ClientError as e:
         module.fail_json(msg='Error retrieving stream event notification configuration: {0}'.format(e))
@@ -480,7 +490,7 @@ def lambda_event_stream(module, aws):
         else:
             # current_state is 'present'
             api_params = dict(FunctionName=module.params['lambda_function_arn'])
-            current_mapping = facts['EventSourceMappings'][0]
+            current_mapping = facts[0]
             api_params.update(UUID=current_mapping['UUID'])
             mapping_changed = False
 
@@ -510,7 +520,7 @@ def lambda_event_stream(module, aws):
     else:
         if current_state == 'present':
             # remove the stream event mapping
-            api_params = dict(UUID=facts['EventSourceMappings'][0]['UUID'])
+            api_params = dict(UUID=facts[0]['UUID'])
 
             try:
                 if not module.check_mode:
@@ -530,8 +540,6 @@ def lambda_event_s3(module, aws):
     :param aws:
     :return dict:
     """
-
-    s3_source_parameters = ('')
 
     client = aws.client('s3')
     api_params = dict()
