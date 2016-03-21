@@ -56,7 +56,7 @@ options:
   version:
     description:
       -  Version associated with the Lambda function alias.
-         A value of 0 (or missing parameter) sets the alias to the $LATEST version.
+         A value of 0 (or omitted parameter) sets the alias to the $LATEST version.
     required: false
     aliases: ['function_version']
 requirements:
@@ -126,46 +126,44 @@ EXAMPLES = '''
 '''
 
 
-def aws_client(module, resource='lambda'):
+class AWSConnection:
     """
-    Returns a boto3 client object for the requested resource type.
-
-    :param module:
-    :param resource:
-    :return:
+    Create the connection object and client objects as required.
     """
 
-    try:
-        region, endpoint, aws_connect_kwargs = get_aws_connection_info(module, boto3=True)
-        aws_connect_kwargs.update(dict(region=region,
-                                       endpoint=endpoint,
-                                       conn_type='client',
-                                       resource=resource
-                                       ))
-        client = boto3_conn(module, **aws_connect_kwargs)
+    def __init__(self, ansible_obj, resources, boto3=True):
 
-    except (ClientError, ParamValidationError, MissingParametersError) as e:
-        module.fail_json(msg="Can't authorize connection - {0}".format(e))
+        try:
+            self.region, self.endpoint, aws_connect_kwargs = get_aws_connection_info(ansible_obj, boto3=boto3)
 
-    return client
+            self.resource_client = dict()
+            if not resources:
+                resources = ['lambda']
 
+            resources.append('iam')
 
-def get_account_id(module):
-    """
-    Returns the account ID.
+            for resource in resources:
+                aws_connect_kwargs.update(dict(region=self.region,
+                                               endpoint=self.endpoint,
+                                               conn_type='client',
+                                               resource=resource
+                                               ))
+                self.resource_client[resource] = boto3_conn(ansible_obj, **aws_connect_kwargs)
 
-    :param module:
-    :return:
-    """
+            # if region is not provided, then get default profile/session region
+            if not self.region:
+                self.region = self.resource_client['iam'].meta.region_name
 
-    client = aws_client(module, resource='iam')
+        except (ClientError, ParamValidationError, MissingParametersError) as e:
+            ansible_obj.fail_json(msg="Unable to connect, authorize or access resource: {0}".format(e))
 
-    try:
-        account_id = client.get_user()['User']['Arn'].split(':')[4]
-    except (ClientError, ValueError, KeyError, IndexError):
-        account_id = ''
+        try:
+            self.account_id = self.resource_client['iam'].get_user()['User']['Arn'].split(':')[4]
+        except (ClientError, ValueError, KeyError, IndexError):
+            self.account_id = ''
 
-    return account_id
+    def client(self, resource='lambda'):
+        return self.resource_client[resource]
 
 
 def pc(key):
@@ -198,11 +196,12 @@ def set_api_params(module, module_params):
     return api_params
 
 
-def validate_params(module):
+def validate_params(module, aws):
     """
     Performs basic parameter validation.
 
-    :param module:
+    :param module: Ansible module reference
+    :param aws: AWS client connection
     :return:
     """
 
@@ -225,15 +224,16 @@ def validate_params(module):
     return
 
 
-def get_lambda_alias(module):
+def get_lambda_alias(module, aws):
     """
     Returns the lambda function alias if it exists.
 
-    :param module:
+    :param module: Ansible module reference
+    :param aws: AWS client connection
     :return:
     """
 
-    client = aws_client(module)
+    client = aws.client('lambda')
 
     # set API parameters
     api_params = set_api_params(module, ('function_name', 'name'))
@@ -251,20 +251,21 @@ def get_lambda_alias(module):
     return results
 
 
-def lambda_alias(module):
+def lambda_alias(module, aws):
     """
     Adds, updates or deletes lambda function aliases.
 
     :param module: Ansible module reference
+    :param aws: AWS client connection
     :return dict:
     """
-    client = aws_client(module)
+    client = aws.client('lambda')
     results = dict()
     changed = False
     current_state = 'absent'
     state = module.params['state']
 
-    facts = get_lambda_alias(module)
+    facts = get_lambda_alias(module, aws)
     if facts:
         current_state = 'present'
 
@@ -311,7 +312,7 @@ def lambda_alias(module):
             except (ClientError, ParamValidationError, MissingParametersError) as e:
                 module.fail_json(msg='Error deleting function alias: {0}'.format(e))
 
-    return dict(changed=changed, ansible_facts=dict(lambda_alias_facts=results or facts))
+    return dict(changed=changed, ansible_facts=dict(lambda_alias_results=results or facts))
 
 
 def main():
@@ -341,9 +342,11 @@ def main():
     if not HAS_BOTO3:
         module.fail_json(msg='Both boto3 & boto are required for this module.')
 
-    validate_params(module)
+    aws = AWSConnection(module, ['lambda'])
 
-    results = lambda_alias(module)
+    validate_params(module, aws)
+
+    results = lambda_alias(module, aws)
 
     module.exit_json(**results)
 

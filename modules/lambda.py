@@ -136,6 +136,9 @@ requirements:
     - boto3
 extends_documentation_fragment:
     - aws
+notes:
+    - Parameter C(version) is only used to deleted a specific version of a lambda function.  It cannot be used for
+      anything else as new versions get I(published) after which they cannot be modified.
 
 '''
 
@@ -176,46 +179,44 @@ EXAMPLES = '''
 '''
 
 
-def aws_client(module, resource='lambda'):
+class AWSConnection:
     """
-    Returns a boto3 client object for the requested resource type.
-
-    :param module:
-    :param resource:
-    :return:
+    Create the connection object and client objects as required.
     """
 
-    try:
-        region, endpoint, aws_connect_kwargs = get_aws_connection_info(module, boto3=True)
-        aws_connect_kwargs.update(dict(region=region,
-                                       endpoint=endpoint,
-                                       conn_type='client',
-                                       resource=resource
-                                       ))
-        client = boto3_conn(module, **aws_connect_kwargs)
+    def __init__(self, ansible_obj, resources, boto3=True):
 
-    except ClientError as e:
-        module.fail_json(msg="Can't authorize connection - {0}".format(e))
+        try:
+            self.region, self.endpoint, aws_connect_kwargs = get_aws_connection_info(ansible_obj, boto3=boto3)
 
-    return client
+            self.resource_client = dict()
+            if not resources:
+                resources = ['lambda']
 
+            resources.append('iam')
 
-def get_account_id(module):
-    """
-    Returns the account ID.
+            for resource in resources:
+                aws_connect_kwargs.update(dict(region=self.region,
+                                               endpoint=self.endpoint,
+                                               conn_type='client',
+                                               resource=resource
+                                               ))
+                self.resource_client[resource] = boto3_conn(ansible_obj, **aws_connect_kwargs)
 
-    :param module:
-    :return:
-    """
+            # if region is not provided, then get default profile/session region
+            if not self.region:
+                self.region = self.resource_client['iam'].meta.region_name
 
-    client = aws_client(module, resource='iam')
+        except (ClientError, ParamValidationError, MissingParametersError) as e:
+            ansible_obj.fail_json(msg="Unable to connect, authorize or access resource: {0}".format(e))
 
-    try:
-        account_id = client.get_user()['User']['Arn'].split(':')[4]
-    except (ClientError, ValueError, KeyError, IndexError):
-        account_id = ''
+        try:
+            self.account_id = self.resource_client['iam'].get_user()['User']['Arn'].split(':')[4]
+        except (ClientError, ValueError, KeyError, IndexError):
+            self.account_id = ''
 
-    return account_id
+    def client(self, resource='lambda'):
+        return self.resource_client[resource]
 
 
 def pc(key):
@@ -248,11 +249,12 @@ def set_api_params(module, module_params):
     return api_params
 
 
-def validate_params(module):
+def validate_params(module, aws):
     """
     Performs basic parameter validation.
 
-    :param module:
+    :param module: Ansible module reference
+    :param aws: AWS client connection
     :return:
     """
 
@@ -279,21 +281,21 @@ def validate_params(module):
     # check if 'role' needs to be expanded in full ARN format
     if not module.params['role'].startswith('arn:aws:iam:'):
         role = module.params['role']
-        account = get_account_id(module)
-        module.params['role'] = 'arn:aws:iam::{0}:role/{1}'.format(account, role)
+        module.params['role'] = 'arn:aws:iam::{0}:role/{1}'.format(aws.account_id, role)
 
     return
 
 
-def upload_to_s3(module):
+def upload_to_s3(module, aws):
     """
     Upload local deployment package to s3.
 
-    :param module:
+    :param module: Ansible module reference
+    :param aws: AWS client connection
     :return:
     """
 
-    client = aws_client(module, resource='s3')
+    client = aws.client('s3')
     s3 = S3Transfer(client)
 
     local_path = module.params['local_path']
@@ -328,15 +330,16 @@ def get_local_package_hash(module):
     return base64.b64encode(hash_lib.digest())
 
 
-def get_lambda_config(module):
+def get_lambda_config(module, aws):
     """
     Returns the lambda function configuration if it exists.
 
-    :param module:
+    :param module: Ansible module reference
+    :param aws: AWS client connection
     :return:
     """
 
-    client = aws_client(module)
+    client = aws.client('lambda')
 
     # set API parameters
     api_params = dict(FunctionName=module.params['function_name'])
@@ -348,7 +351,7 @@ def get_lambda_config(module):
     try:
         results = client.get_function_configuration(**api_params)
 
-    except ClientError as e:
+    except (ClientError, ParamValidationError, MissingParametersError) as e:
         if e.response['Error']['Code'] == 'ResourceNotFoundException':
             results = None
         else:
@@ -357,20 +360,21 @@ def get_lambda_config(module):
     return results
 
 
-def lambda_function(module):
+def lambda_function(module, aws):
     """
     Adds, updates or deletes lambda function code and configuration.
 
     :param module: Ansible module reference
+    :param aws: AWS client connection
     :return dict:
     """
-    client = aws_client(module)
+    client = aws.client('lambda')
     results = dict()
     changed = False
     current_state = 'absent'
     state = module.params['state']
 
-    facts = get_lambda_config(module)
+    facts = get_lambda_config(module, aws)
     if facts:
         current_state = 'present'
 
@@ -384,7 +388,7 @@ def lambda_function(module):
             if s3_hash != local_hash:
                 # code has changed so upload to s3
                 if not module.check_mode:
-                    upload_to_s3(module)
+                    upload_to_s3(module, aws)
 
                 api_params = set_api_params(module, ('function_name', ))
                 api_params.update(set_api_params(module, ('s3_bucket', 's3_key', 's3_object_version')))
@@ -393,7 +397,7 @@ def lambda_function(module):
                     if not module.check_mode:
                         results = client.update_function_code(**api_params)
                     changed = True
-                except ClientError as e:
+                except (ClientError, ParamValidationError, MissingParametersError) as e:
                     module.fail_json(msg='Error updating function code: {0}'.format(e))
 
             # check if config has changed
@@ -443,7 +447,7 @@ def lambda_function(module):
 
         else:  # create function
             if not module.check_mode:
-                upload_to_s3(module)
+                upload_to_s3(module, aws)
 
             api_params = set_api_params(module, ('function_name', 'runtime', 'role', 'handler'))
             api_params.update(set_api_params(module, ('memory_size', 'timeout', 'description', 'publish')))
@@ -454,7 +458,7 @@ def lambda_function(module):
                 if not module.check_mode:
                     results = client.create_function(**api_params)
                 changed = True
-            except ClientError as e:
+            except (ClientError, ParamValidationError, MissingParametersError) as e:
                 module.fail_json(msg='Error creating: {0}'.format(e))
 
     else:  # state = 'absent'
@@ -470,10 +474,10 @@ def lambda_function(module):
                 if not module.check_mode:
                     results = client.delete_function(**api_params)
                 changed = True
-            except ClientError as e:
+            except (ClientError, ParamValidationError, MissingParametersError) as e:
                 module.fail_json(msg='Error deleting function: {0}'.format(e))
 
-    return dict(changed=changed, ansible_facts=dict(lambda_facts=results or facts))
+    return dict(changed=changed, ansible_facts=dict(lambda_results=results or facts))
 
 
 def main():
@@ -514,9 +518,11 @@ def main():
     if not HAS_BOTO3:
         module.fail_json(msg='Both boto3 & boto are required for this module.')
 
-    validate_params(module)
+    aws = AWSConnection(module, ['lambda', 's3'])
 
-    results = lambda_function(module)
+    validate_params(module, aws)
+
+    results = lambda_function(module, aws)
 
     module.exit_json(**results)
 

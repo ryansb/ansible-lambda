@@ -158,6 +158,7 @@ def invoke_function(client, module):
 
     results = dict()
     api_params = dict()
+    changed = False
 
     resource = 'invoke'
 
@@ -174,6 +175,7 @@ def invoke_function(client, module):
     # execute lambda function 
     try:
         results = client.invoke(**api_params)
+        changed = True
     except ClientError as e:
         module.fail_json(msg='Error invoking function {0}: {1}'.format(module.params['function_name'], e))
     except EndpointConnectionError as e:
@@ -183,7 +185,7 @@ def invoke_function(client, module):
     if 'Payload' in results:
         results['Payload'] = json.loads(results['Payload'].read())
 
-    return results
+    return dict(changed=changed, ansible_facts=dict(lambda_invocation_results=results))
 
 
 def main():
@@ -237,8 +239,7 @@ def main():
     except EndpointConnectionError as e:
         module.fail_json(msg="Connection Error - {0}".format(e))
 
-    response = invoke_function(client, module)
-    results = dict(ansible_facts=response, changed=False)
+    results = invoke_function(client, module)
 
     module.exit_json(**results)
 
