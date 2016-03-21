@@ -178,6 +178,14 @@ EXAMPLES = '''
     debug: var=lambda_facts
 '''
 
+RETURN = '''
+lambda_results:
+    description: dictionary of items returned by the API describing the function configuration
+    returned: success
+    type: dict
+    sample: lambda_results.Version can be useful when publishing a new version
+'''
+
 
 class AWSConnection:
     """

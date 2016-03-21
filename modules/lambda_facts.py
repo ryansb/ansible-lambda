@@ -84,6 +84,37 @@ EXAMPLES = '''
   debug: var=lambda_facts
 '''
 
+RETURN = '''
+lambda_facts:
+    description: lambda facts
+    returned: success
+    type: dict
+lambda_facts.aliases:
+    description: lambda function aliases
+    returned: success
+    type: list
+lambda_facts.function:
+    description: lambda function configuration, when function_name is specified
+    returned: success
+    type: dict
+lambda_facts.function_list:
+    description: list of lambda functions, when function_name is not specified
+    returned: success
+    type: list
+lambda_facts.mappings:
+    description: lambda event source mappings
+    returned: success
+    type: list
+lambda_facts.policy:
+    description: policy document attached to lambda function
+    returned: success
+    type: dict
+lambda_facts.versions:
+    description: list of all version configurations for a specified function
+    returned: success
+    type: list
+'''
+
 
 def fix_return(node):
     """
@@ -131,7 +162,7 @@ def alias_details(client, module):
             lambda_facts.update(aliases=client.list_aliases(FunctionName=function_name, **params)['Aliases'])
         except ClientError as e:
             if e.response['Error']['Code'] == 'ResourceNotFoundException':
-                lambda_facts['msg'] = 'No aliases found.'
+                lambda_facts.update(aliases=[])
             else:
                 module.fail_json(msg='Unable to get {0} aliases, error: {1}'.format(function_name, e))
     else:
@@ -184,7 +215,7 @@ def config_details(client, module):
             lambda_facts.update(function=client.get_function_configuration(FunctionName=function_name))
         except ClientError as e:
             if e.response['Error']['Code'] == 'ResourceNotFoundException':
-                lambda_facts['msg'] = 'No lambda function found.'
+                lambda_facts.update(function={})
             else:
                 module.fail_json(msg='Unable to get {0} configuration, error: {1}'.format(function_name, e))
     else:
@@ -196,10 +227,10 @@ def config_details(client, module):
             params['Marker'] = module.params.get('next_marker')
 
         try:
-            lambda_facts.update(function_list=client.list_functions(**params))
+            lambda_facts.update(function_list=client.list_functions(**params)['Functions'])
         except ClientError as e:
             if e.response['Error']['Code'] == 'ResourceNotFoundException':
-                lambda_facts['msg'] = 'No lambda functions found.'
+                lambda_facts.update(function_list=[])
             else:
                 module.fail_json(msg='Unable to get function list, error: {0}'.format(e))
 
@@ -234,7 +265,7 @@ def mapping_details(client, module):
         lambda_facts.update(mappings=client.list_event_source_mappings(**params)['EventSourceMappings'])
     except ClientError as e:
         if e.response['Error']['Code'] == 'ResourceNotFoundException':
-            lambda_facts['msg'] = 'No mappings found.'
+            lambda_facts.update(mappings=[])
         else:
             module.fail_json(msg='Unable to get source event mappings, error: {0}'.format(e))
 
@@ -262,7 +293,7 @@ def policy_details(client, module):
             lambda_facts.update(policy=json.loads(client.get_policy(FunctionName=function_name)['Policy']))
         except ClientError as e:
             if e.response['Error']['Code'] == 'ResourceNotFoundException':
-                lambda_facts['msg'] = 'No policy found.'
+                lambda_facts.update(policy={})
             else:
                 module.fail_json(msg='Unable to get {0} policy, error: {1}'.format(function_name, e))
     else:
@@ -295,7 +326,7 @@ def version_details(client, module):
             lambda_facts.update(versions=client.list_versions_by_function(FunctionName=function_name, **params)['Versions'])
         except ClientError as e:
             if e.response['Error']['Code'] == 'ResourceNotFoundException':
-                lambda_facts['msg'] = 'No versions found.'
+                lambda_facts.update(versions=[])
             else:
                 module.fail_json(msg='Unable to get {0} versions, error: {1}'.format(function_name, e))
     else:

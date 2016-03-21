@@ -14,6 +14,14 @@
 # You should have received a copy of the GNU General Public License
 # along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
 
+try:
+    import boto3
+    import boto                                         # seems to be needed for ansible.module_utils
+    from botocore.exceptions import ClientError, EndpointConnectionError
+    HAS_BOTO3 = True
+except ImportError:
+    HAS_BOTO3 = False
+
 DOCUMENTATION = '''
 ---
 module: lambda_invoke
@@ -95,13 +103,13 @@ EXAMPLES = '''
   debug: var=Results
 '''
 
-try:
-    import boto3
-    import boto                                         # seems to be needed for ansible.module_utils
-    from botocore.exceptions import ClientError, EndpointConnectionError
-    HAS_BOTO3 = True
-except ImportError:
-    HAS_BOTO3 = False
+RETURN = '''
+lambda_invocation_results:
+    description: dictionary of items returned as a result of the lambda function invocation
+    returned: success
+    type: dict
+    sample: lambda_invocation_results.Payload contains the data returned by the function
+'''
 
 
 # ----------------------------------
@@ -177,9 +185,12 @@ def invoke_function(client, module):
         results = client.invoke(**api_params)
         changed = True
     except ClientError as e:
-        module.fail_json(msg='Error invoking function {0}: {1}'.format(module.params['function_name'], e))
+        if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            module.fail_json(msg='Lambda function {0} not found!'.format(module.params['function_name']))
+        else:
+            module.fail_json(msg='Error invoking function {0}: {1}'.format(module.params['function_name'], e))
     except EndpointConnectionError as e:
-        module.fail_json(msg='Lambda function not found: {0}'.format(e))
+        module.fail_json(msg='Lambda connection error: {0}'.format(e))
 
     # The returned Payload is a botocore StreamingBody object. Read all content and convert to JSON.
     if 'Payload' in results:

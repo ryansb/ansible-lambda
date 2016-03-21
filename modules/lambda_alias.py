@@ -122,7 +122,13 @@ EXAMPLES = '''
       name: Prod
       version: "{{ production_version }}"
       description: "Production is version {{ production_version }}"
+'''
 
+RETURN = '''
+lambda_alias_results:
+    description: dictionary of items returned by the API describing the function alias
+    returned: success
+    type: dict
 '''
 
 

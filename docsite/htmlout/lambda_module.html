@@ -363,8 +363,9 @@
 <li><a class="reference internal" href="#requirements" id="id2">Requirements</a></li>
 <li><a class="reference internal" href="#options" id="id3">Options</a></li>
 <li><a class="reference internal" href="#examples" id="id4">Examples</a></li>
-<li><a class="reference internal" href="#notes" id="id5">Notes</a></li>
-<li><a class="reference internal" href="#this-is-an-extras-module" id="id6">This is an Extras Module</a></li>
+<li><a class="reference internal" href="#return-values" id="id5">Return Values</a></li>
+<li><a class="reference internal" href="#notes" id="id6">Notes</a></li>
+<li><a class="reference internal" href="#this-is-an-extras-module" id="id7">This is an Extras Module</a></li>
 </ul>
 </div>
 <div class="section" id="synopsis">
@@ -574,8 +575,34 @@
 </div>
 </div></blockquote>
 </div>
+<div class="section" id="return-values">
+<h2><a class="toc-backref" href="#id5">Return Values</a><a class="headerlink" href="#return-values" title="Permalink to this headline">¶</a></h2>
+<p>Common return values are documented here <a class="reference internal" href="common_return_values.html"><em>Common Return Values</em></a>, the following are the fields unique to this module:</p>
+<table border=1 cellpadding=4>
+<tr>
+<th class="head">name</th>
+<th class="head">description</th>
+<th class="head">returned</th>
+<th class="head">type</th>
+<th class="head">sample</th>
+</tr>
+
+    <tr>
+    <td> lambda_results </td>
+    <td> dictionary of items returned by the API describing the function configuration </td>
+    <td align=center> success </td>
+    <td align=center> dict </td>
+    <td align=center> lambda_results.Version can be useful when publishing a new version </td>
+</tr>
+
+</table>
+</br></br></div>
 <div class="section" id="notes">
-<h2><a class="toc-backref" href="#id5">Notes</a><a class="headerlink" href="#notes" title="Permalink to this headline">¶</a></h2>
+<h2><a class="toc-backref" href="#id6">Notes</a><a class="headerlink" href="#notes" title="Permalink to this headline">¶</a></h2>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Parameter <code class="docutils literal"><span class="pre">version</span></code> is only used to deleted a specific version of a lambda function.  It cannot be used for anything else as new versions get <em>published</em> after which they cannot be modified.</p>
+</div>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">If parameters are not set within the module, the following environment variables can be used in decreasing order of precedence <code class="docutils literal"><span class="pre">AWS_URL</span></code> or <code class="docutils literal"><span class="pre">EC2_URL</span></code>, <code class="docutils literal"><span class="pre">AWS_ACCESS_KEY_ID</span></code> or <code class="docutils literal"><span class="pre">AWS_ACCESS_KEY</span></code> or <code class="docutils literal"><span class="pre">EC2_ACCESS_KEY</span></code>, <code class="docutils literal"><span class="pre">AWS_SECRET_ACCESS_KEY</span></code> or <code class="docutils literal"><span class="pre">AWS_SECRET_KEY</span></code> or <code class="docutils literal"><span class="pre">EC2_SECRET_KEY</span></code>, <code class="docutils literal"><span class="pre">AWS_SECURITY_TOKEN</span></code> or <code class="docutils literal"><span class="pre">EC2_SECURITY_TOKEN</span></code>, <code class="docutils literal"><span class="pre">AWS_REGION</span></code> or <code class="docutils literal"><span class="pre">EC2_REGION</span></code></p>
@@ -590,7 +617,7 @@
 </div>
 </div>
 <div class="section" id="this-is-an-extras-module">
-<h2><a class="toc-backref" href="#id6">This is an Extras Module</a><a class="headerlink" href="#this-is-an-extras-module" title="Permalink to this headline">¶</a></h2>
+<h2><a class="toc-backref" href="#id7">This is an Extras Module</a><a class="headerlink" href="#this-is-an-extras-module" title="Permalink to this headline">¶</a></h2>
 <p>For more information on what this means please read <a class="reference internal" href="modules_extra.html"><em>Extras Modules</em></a></p>
 <p>For help in developing on modules, should you be so inclined, please read <a class="reference internal" href="community.html"><em>Community Information &amp; Contributing</em></a>, <a class="reference internal" href="developing_test_pr.html"><em>Helping Testing PRs</em></a> and <a class="reference internal" href="developing_modules.html"><em>Developing Modules</em></a>.</p>
 </div>
@@ -615,7 +642,7 @@
 
   <p>
   &copy; Copyright 2016 <a href="http://ansible.com">Ansible, Inc.</a>.
-    Last updated on Mar 20, 2016.
+    Last updated on Mar 21, 2016.
   </p>
 
 Ansible docs are generated from <a href="https://github.com/ansible/ansible">GitHub sources</A> using <A HREF="http://sphinx-doc.org/">Sphinx</A> using a theme provided by <a href="http://readthedocs.org">Read the Docs</a>. . Module documentation is not edited directly, but is generated from the source code for the modules.  To submit an update to module docs, edit the 'DOCUMENTATION' metadata in the <A HREF="https://github.com/ansible/ansible-modules-core">core</A> and <A HREF="https://github.com/ansible/ansible-modules-extras">extras</A> modules source repositories. 
