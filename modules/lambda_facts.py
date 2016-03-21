@@ -15,6 +15,8 @@
 # along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
 
 import datetime
+import sys
+
 try:
     import boto3
     import boto                                         # seems to be needed for ansible.module_utils
@@ -45,7 +47,12 @@ options:
       - The name of the lambda function for which facts are requested.
     required: false
     default: null
-    aliases: [ "function"]
+    aliases: [ "function", "name"]
+  event_source_arn:
+    description:
+      - For query type 'mappings', this is the Amazon Resource Name (ARN) of the Amazon Kinesis or DynamoDB stream.
+    default: null
+    required: false
 author: Pierre Jodouin (@pjodouin)
 requirements:
     - boto3
@@ -68,13 +75,13 @@ EXAMPLES = '''
     query: versions
     function_name: myFunction
   register: my_function_versions
-# List all lambda functions
-- name: List all functions
+# List all lambda function versions
+- name: List all function
   lambda_facts:
-    query: versions
+    query: all
     max_items: 20
 - name: show Lambda facts
-  debug: var=Versions
+  debug: var=lambda_facts
 '''
 
 
@@ -123,7 +130,10 @@ def alias_details(client, module):
         try:
             lambda_facts.update(client.list_aliases(FunctionName=function_name, **params))
         except ClientError as e:
-            module.fail_json(msg='Unable to get {0} aliases, error: {1}'.format(function_name, e))
+            if e.response['Error']['Code'] == 'ResourceNotFoundException':
+                lambda_facts['msg'] = 'No aliases found.'
+            else:
+                module.fail_json(msg='Unable to get {0} aliases, error: {1}'.format(function_name, e))
     else:
         module.fail_json(msg='Parameter function_name required for query=aliases.')
 
@@ -173,7 +183,10 @@ def config_details(client, module):
         try:
             lambda_facts.update(client.get_function_configuration(FunctionName=function_name))
         except ClientError as e:
-            module.fail_json(msg='Unable to get {0} configuration, error: {1}'.format(function_name, e))
+            if e.response['Error']['Code'] == 'ResourceNotFoundException':
+                lambda_facts['msg'] = 'No lambda function found.'
+            else:
+                module.fail_json(msg='Unable to get {0} configuration, error: {1}'.format(function_name, e))
     else:
         params = dict()
         if module.params.get('max_items'):
@@ -185,7 +198,10 @@ def config_details(client, module):
         try:
             lambda_facts.update(client.list_functions(**params))
         except ClientError as e:
-            module.fail_json(msg='Unable to get function list, error: {0}'.format(e))
+            if e.response['Error']['Code'] == 'ResourceNotFoundException':
+                lambda_facts['msg'] = 'No lambda functions found.'
+            else:
+                module.fail_json(msg='Unable to get function list, error: {0}'.format(e))
 
     return lambda_facts
 
@@ -217,7 +233,10 @@ def mapping_details(client, module):
     try:
         lambda_facts.update(client.list_event_source_mappings(**params))
     except ClientError as e:
-        module.fail_json(msg='Unable to get source event mappings, error: {0}'.format(e))
+        if e.response['Error']['Code'] == 'ResourceNotFoundException':
+            lambda_facts['msg'] = 'No mappings found.'
+        else:
+            module.fail_json(msg='Unable to get source event mappings, error: {0}'.format(e))
 
     return lambda_facts
 
@@ -243,7 +262,7 @@ def policy_details(client, module):
             lambda_facts.update(Policy=json.loads(client.get_policy(FunctionName=function_name)['Policy']))
         except ClientError as e:
             if e.response['Error']['Code'] == 'ResourceNotFoundException':
-                lambda_facts.update(Policy=dict())
+                lambda_facts['msg'] = 'No policy found.'
             else:
                 module.fail_json(msg='Unable to get {0} policy, error: {1}'.format(function_name, e))
     else:
@@ -273,9 +292,12 @@ def version_details(client, module):
             params['Marker'] = module.params.get('next_marker')
 
         try:
-            lambda_facts.update(client.list_versions_by_function(FunctionName=function_name, **params))
+            lambda_facts = client.list_versions_by_function(FunctionName=function_name, **params)
         except ClientError as e:
-            module.fail_json(msg='Unable to get {0} versions, error: {1}'.format(function_name, e))
+            if e.response['Error']['Code'] == 'ResourceNotFoundException':
+                lambda_facts['msg'] = 'No versions found.'
+            else:
+                module.fail_json(msg='Unable to get {0} versions, error: {1}'.format(function_name, e))
     else:
         module.fail_json(msg='Parameter function_name required for query=versions.')
 
@@ -290,7 +312,7 @@ def main():
     """
     argument_spec = ec2_argument_spec()
     argument_spec.update(dict(
-            function_name=dict(required=False, default=None, aliases=['function']),
+            function_name=dict(required=False, default=None, aliases=['function', 'name']),
             query=dict(required=False, choices=['aliases', 'all', 'config', 'mappings', 'policy',  'versions'], default='all'),
             event_source_arn=dict(required=False, default=None)
         )
@@ -328,15 +350,19 @@ def main():
     except ClientError as e:
         module.fail_json(msg="Can't authorize connection - {0}".format(e))
 
-    invocations = {
-        'aliases': alias_details,
-        'all': all_details,
-        'config': config_details,
-        'mappings': mapping_details,
-        'policy': policy_details,
-        'versions': version_details,
-    }
-    lambda_facts = fix_return(invocations[module.params.get('query')](client, module))
+    this_module = sys.modules[__name__]
+
+    invocations = dict(
+        aliases='alias_details',
+        all='all_details',
+        config='config_details',
+        mappings='mapping_details',
+        policy='policy_details',
+        versions='version_details',
+    )
+
+    this_module_function = getattr(this_module, invocations[module.params['query']])
+    lambda_facts = fix_return(this_module_function(client, module))
 
     results = dict(ansible_facts=lambda_facts, changed=False)
 
