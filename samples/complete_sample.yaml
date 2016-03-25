@@ -41,7 +41,7 @@
       state: "{{ state | default('present') }}"
       event_source: s3
       function_name: "{{ function_name }}"
-#      alias: Dev
+      alias: Dev
       source_params:
         id: lambda-s3-myBucket-create-data-log
         bucket: buzz-scanner
@@ -55,12 +55,23 @@
       state: "{{ state | default('present') }}"
       event_source: stream
       function_name: "{{ function_name }}"
-#      alias: Dev
+      alias: Dev
       source_params:
         source_arn: arn:aws:dynamodb:us-east-1:123456789012:table/tableName/stream/2016-03-19T19:51:37.457
         enabled: True
         batch_size: 120
         starting_position: TRIM_HORIZON
+
+  - name: SNS event mapping
+    lambda_event:
+      state: "{{ state | default('present') }}"
+      event_source: sns
+      function_name: "{{ function_name }}"
+      alias: Dev
+      source_params:
+        id: lambda-sns-topic-notify
+        topic_arn: arn:aws:sns:us-east-1:123456789012:sns-lambda
+        # enabled: True
 
   - name: show all stuff...
     debug: var=lambda_facts.function
@@ -76,6 +87,9 @@
 
   - name: show source event config
     debug: var=lambda_stream_events
+
+  - name: show SNS event mapping
+    debug: var=lambda_sns_event
 
   - name: execute lambda function
     lambda_invoke:

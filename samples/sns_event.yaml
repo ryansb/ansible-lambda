@@ -12,8 +12,8 @@
       alias: Dev
       source_params:
         id: lambda-sns-topic-notify
-        topic_arn: arn:aws:sns:us-east-1:469333712854:sns-lambda
+        topic_arn: arn:aws:sns:us-east-1:123456789012:sns-lambda
         # enabled: True
 
   - name: show source event cnfig
-    debug: var=lambda_sns_events
+    debug: var=lambda_sns_event

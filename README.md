@@ -179,8 +179,8 @@ Use to create, update or delete lambda function source event mappings, which inc
         id: lambda-sns-topic-notify
         topic_arn: arn:aws:sns:us-east-1:123456789012:sns-some-topic
 
-  - name: show source event config
-    debug: var=lambda_sns_events
+  - name: show SNS event mapping
+    debug: var=lambda_sns_event
 
 ```
 
