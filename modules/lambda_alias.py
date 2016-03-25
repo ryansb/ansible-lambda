@@ -158,7 +158,7 @@ class AWSConnection:
 
             # if region is not provided, then get default profile/session region
             if not self.region:
-                self.region = self.resource_client['iam'].meta.region_name
+                self.region = self.resource_client['lambda'].meta.region_name
 
         except (ClientError, ParamValidationError, MissingParametersError) as e:
             ansible_obj.fail_json(msg="Unable to connect, authorize or access resource: {0}".format(e))

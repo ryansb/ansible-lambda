@@ -62,23 +62,26 @@ options:
     description:
       -  Source of the event that triggers the lambda function.
     required: true
-    choices: ['s3',]
+    choices: ['s3', 'Kinesis', 'DynamoDB', 'SNS']
   source_params:
     description:
       -  Sub-parameters required for event source.
-      -  I("S3 EVENT SOURCE:")
+      -  I("S3 event source:")
       -  C(id) Unique ID for this source event.
       -  C(bucket) Name of source bucket.
       -  C(prefix) Bucket prefix (e.g. images/)
       -  C(suffix) Bucket suffix (e.g. log)
       -  C(events) List of events (e.g. ['s3:ObjectCreated:Put'])
-      -  I("STREAM EVENT SOURCE:")
+      -  I("stream event source:")
       -  C(source_arn) The Amazon Resource Name (ARN) of the Kinesis or DynamoDB stream that is the event source.
       -  C(enabled) Indicates whether AWS Lambda should begin polling the event source. Default is True.
       -  C(batch_size) The largest number of records that AWS Lambda will retrieve from your event source at the
          time of invoking your function. Default is 100.
       -  C(starting_position) The position in the stream where AWS Lambda should start reading.
          Choices are TRIM_HORIZON or LATEST.
+      -  I("SNS event source:")
+      -  C(id) Unique ID for this source event.
+      -  C(topic_arn) The ARN of the topic to you which you want to subscribe the lambda function.
     required: true
 requirements:
     - boto3
@@ -109,7 +112,7 @@ EXAMPLES = '''
         events:
         - s3:ObjectCreated:Put
 
-# Simple example that creates a lambda event notification for a DynamoDB stream
+# Example that creates a lambda event notification for a DynamoDB stream
 - hosts: localhost
   gather_facts: no
   vars:
@@ -130,6 +133,20 @@ EXAMPLES = '''
   - name: show source event
     debug: var=lambda_stream_events
 
+# example of SNS topic
+  - name: SNS event mapping
+    lambda_event:
+      state: "{{ state | default('present') }}"
+      event_source: sns
+      function_name: SaveMessage
+      alias: Prod
+      source_params:
+        id: lambda-sns-topic-notify
+        topic_arn: arn:aws:sns:us-east-1:123456789012:sns-some-topic
+
+  - name: show source event config
+    debug: var=lambda_sns_event
+
 '''
 
 RETURN = '''
@@ -141,6 +158,11 @@ lambda_stream_events:
     description: list of dictionaries returned by the API describing stream event mappings
     returned: success
     type: list
+lambda_sns_event:
+    description: dictionary returned by the API describing SNS event mapping
+    returned: success
+    type: dict
+
 '''
 
 # ---------------------------------------------------------------------------------------------------
@@ -176,11 +198,12 @@ class AWSConnection:
 
             # if region is not provided, then get default profile/session region
             if not self.region:
-                self.region = self.resource_client['iam'].meta.region_name
+                self.region = self.resource_client['lambda'].meta.region_name
 
         except (ClientError, ParamValidationError, MissingParametersError) as e:
             ansible_obj.fail_json(msg="Unable to connect, authorize or access resource: {0}".format(e))
 
+        # set account ID
         try:
             self.account_id = self.resource_client['iam'].get_user()['User']['Arn'].split(':')[4]
         except (ClientError, ValueError, KeyError, IndexError):
@@ -686,10 +709,10 @@ def lambda_event_sns(module, aws):
     current_subscription = dict()
     endpoint = module.params['lambda_function_arn']
     try:
-        while not subscription_arn:
+        while not current_subscription:
             facts = client.list_subscriptions_by_topic(**api_params)
             for subscription in facts.get('Subscriptions', []):
-                if subscription['EndPoint'] == endpoint:
+                if subscription['Endpoint'] == endpoint:
                     current_subscription = subscription
                     current_state = 'present'
                     break
@@ -701,12 +724,12 @@ def lambda_event_sns(module, aws):
             else:
                 break
 
-    except ClientError as e:
+    except (ClientError, ParamValidationError, MissingParametersError) as e:
         module.fail_json(msg='Error retrieving SNS subscriptions: {0}'.format(e))
 
     if state == 'present':
         if current_state == 'present':
-            # subcription cannot be updated so nothing to do here
+            # subscription cannot be updated so nothing to do here
             pass
         else:
             # add policy permission before creating the subscription
@@ -715,7 +738,6 @@ def lambda_event_sns(module, aws):
                 action='lambda:InvokeFunction',
                 principal='sns.amazonaws.com',
                 source_arn=source_params['topic_arn'],
-                # source_account=aws.account_id,
             )
             assert_policy_state(module, aws, policy, present=True)
 
@@ -727,11 +749,10 @@ def lambda_event_sns(module, aws):
             )
             try:
                 if not module.check_mode:
-                    current_subscription['SubscriptionArn'] = client.subscribe(**api_params)
+                    current_subscription = client.subscribe(**api_params)
                 changed = True
             except (ClientError, ParamValidationError, MissingParametersError) as e:
                 module.fail_json(msg='Error creating SNS event mapping for lambda: {0}'.format(e))
-
 
     else:
         if current_state == 'present':
@@ -751,7 +772,7 @@ def lambda_event_sns(module, aws):
             )
             assert_policy_state(module, aws, policy, present=False)
 
-    return dict(changed=changed, ansible_facts=dict(lambda_sns_events=current_subscription))
+    return dict(changed=changed, ansible_facts=dict(lambda_sns_event=current_subscription))
 
 
 # ---------------------------------------------------------------------------------------------------
@@ -794,7 +815,7 @@ def main():
     if not HAS_BOTO3:
         module.fail_json(msg='Both boto3 & boto are required for this module.')
 
-    aws = AWSConnection(module, ['lambda', 's3'])
+    aws = AWSConnection(module, ['lambda', 's3', 'sns'])
 
     validate_params(module, aws)
 
