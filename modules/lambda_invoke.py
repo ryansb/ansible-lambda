@@ -183,7 +183,13 @@ def invoke_function(client, module):
     # execute lambda function 
     try:
         results = client.invoke(**api_params)
-        changed = True
+        if module.check_mode:
+            results.pop('Payload')
+        else:
+            # The returned Payload is a botocore StreamingBody object. Read all content and convert to JSON.
+            results['Payload'] = json.loads(results['Payload'].read())
+            changed = True
+
     except ClientError as e:
         if e.response['Error']['Code'] == 'ResourceNotFoundException':
             module.fail_json(msg='Lambda function {0} not found!'.format(module.params['function_name']))
@@ -191,10 +197,6 @@ def invoke_function(client, module):
             module.fail_json(msg='Error invoking function {0}: {1}'.format(module.params['function_name'], e))
     except EndpointConnectionError as e:
         module.fail_json(msg='Lambda connection error: {0}'.format(e))
-
-    # The returned Payload is a botocore StreamingBody object. Read all content and convert to JSON.
-    if 'Payload' in results:
-        results['Payload'] = json.loads(results['Payload'].read())
 
     return dict(changed=changed, ansible_facts=dict(lambda_invocation_results=results))
 
