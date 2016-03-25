@@ -179,6 +179,7 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
+---
 lambda_results:
     description: dictionary of items returned by the API describing the function configuration
     returned: success

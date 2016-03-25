@@ -66,22 +66,22 @@ options:
   source_params:
     description:
       -  Sub-parameters required for event source.
-      -  I("S3 event source:")
+      -  I(== S3 event source ==)
       -  C(id) Unique ID for this source event.
       -  C(bucket) Name of source bucket.
       -  C(prefix) Bucket prefix (e.g. images/)
       -  C(suffix) Bucket suffix (e.g. log)
       -  C(events) List of events (e.g. ['s3:ObjectCreated:Put'])
-      -  I("stream event source:")
+      -  I(== stream event source ==)
       -  C(source_arn) The Amazon Resource Name (ARN) of the Kinesis or DynamoDB stream that is the event source.
       -  C(enabled) Indicates whether AWS Lambda should begin polling the event source. Default is True.
       -  C(batch_size) The largest number of records that AWS Lambda will retrieve from your event source at the
          time of invoking your function. Default is 100.
       -  C(starting_position) The position in the stream where AWS Lambda should start reading.
          Choices are TRIM_HORIZON or LATEST.
-      -  I("SNS event source:")
+      -  I(== SNS event source ==)
       -  C(id) Unique ID for this source event.
-      -  C(topic_arn) The ARN of the topic to you which you want to subscribe the lambda function.
+      -  C(topic_arn) The ARN of the topic to which you want to subscribe the lambda function.
     required: true
 requirements:
     - boto3
@@ -150,6 +150,7 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
+---
 lambda_s3_events:
     description: list of dictionaries returned by the API describing S3 event mappings
     returned: success

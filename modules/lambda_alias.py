@@ -125,6 +125,7 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
+---
 lambda_alias_results:
     description: dictionary of items returned by the API describing the function alias
     returned: success

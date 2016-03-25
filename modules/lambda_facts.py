@@ -85,6 +85,7 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
+---
 lambda_facts:
     description: lambda facts
     returned: success

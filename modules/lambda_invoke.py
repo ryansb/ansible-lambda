@@ -104,6 +104,7 @@ EXAMPLES = '''
 '''
 
 RETURN = '''
+---
 lambda_invocation_results:
     description: dictionary of items returned as a result of the lambda function invocation
     returned: success
