@@ -1,8 +1,10 @@
 # Ansible Cloud Modules & Plugins for AWS Lambda
 #### Version 0.6 [![Build Status](https://travis-ci.org/pjodouin/ansible-lambda.svg)](https://travis-ci.org/pjodouin/ansible-lambda)
 
-These modules help manage AWS Lambda resources including code, configuration, aliases, versions and event source mappings. A lookup plugin is also included which allows looking up values via a Lambda function.
+These modules help manage AWS Lambda resources including code, configuration, aliases, versions and event source mappings, which currently include S3, DynamoDB streams, Kinesis streams and SNS topics. A lookup plugin is also included which allows looking up values via a Lambda function.
 
+
+*Note:*  A [pull request](https://github.com/ansible/ansible-modules-extras/pull/1890) for these modules has now been submitted for inclusion in _ansible-module-extras_ and is awaiting community review.
 
 ## Requirements
 - python >= 2.6
@@ -126,7 +128,7 @@ Use to create, update or delete lambda function aliases.
 
 ### lambda_event:
 ___
-Use to create, update or delete lambda function source event mappings.
+Use to create, update or delete lambda function source event mappings, which include Kinesis/DynamoDB streams, S3 events and SNS topics.
 
 ##### Example Playbook
 ```yaml
@@ -166,6 +168,19 @@ Use to create, update or delete lambda function source event mappings.
 
   - name: show source event config
     debug: var=lambda_stream_events
+
+  - name: SNS event mapping
+    lambda_event:
+      state: "{{ state | default('present') }}"
+      event_source: sns
+      function_name: SaveMessage
+      alias: Prod
+      source_params:
+        id: lambda-sns-topic-notify
+        topic_arn: arn:aws:sns:us-east-1:123456789012:sns-some-topic
+
+  - name: show source event config
+    debug: var=lambda_sns_events
 
 ```
 
