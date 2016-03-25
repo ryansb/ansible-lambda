@@ -656,6 +656,104 @@ def lambda_event_s3(module, aws):
 
     return dict(changed=changed, ansible_facts=dict(lambda_s3_events=current_lambda_configs))
 
+
+def lambda_event_sns(module, aws):
+    """
+    Adds, updates or deletes lambda sns event notifications.
+
+    :param module: Ansible module reference
+    :param aws:
+    :return dict:
+    """
+
+    client = aws.client('sns')
+    api_params = dict()
+    changed = False
+    current_state = 'absent'
+    state = module.params['state']
+
+    # check if required sub-parameters are present
+    source_params = module.params['source_params']
+    if not source_params.get('id'):
+        module.fail_json(msg="Source parameter 'id' is required for SNS event.")
+
+    if source_params.get('topic_arn'):
+        api_params = dict(TopicArn=source_params['topic_arn'])
+    else:
+        module.fail_json(msg="Source parameter 'topic_arn' is required for SNS event.")
+
+    # check if SNS subscription exists
+    current_subscription = dict()
+    endpoint = module.params['lambda_function_arn']
+    try:
+        while not subscription_arn:
+            facts = client.list_subscriptions_by_topic(**api_params)
+            for subscription in facts.get('Subscriptions', []):
+                if subscription['EndPoint'] == endpoint:
+                    current_subscription = subscription
+                    current_state = 'present'
+                    break
+
+            # if there are more than 100 subscriptions, NextToken will be present so if
+            # subscription is not found yet, get next block starting at NextToken
+            if 'NextToken' in facts and not current_subscription:
+                api_params.update(NextToken=facts['NextToken'])
+            else:
+                break
+
+    except ClientError as e:
+        module.fail_json(msg='Error retrieving SNS subscriptions: {0}'.format(e))
+
+    if state == 'present':
+        if current_state == 'present':
+            # subcription cannot be updated so nothing to do here
+            pass
+        else:
+            # add policy permission before creating the subscription
+            policy = dict(
+                statement_id=source_params['id'],
+                action='lambda:InvokeFunction',
+                principal='sns.amazonaws.com',
+                source_arn=source_params['topic_arn'],
+                # source_account=aws.account_id,
+            )
+            assert_policy_state(module, aws, policy, present=True)
+
+            # create subscription
+            api_params = dict(
+                TopicArn=source_params['topic_arn'],
+                Endpoint=endpoint,
+                Protocol='lambda'
+            )
+            try:
+                if not module.check_mode:
+                    current_subscription['SubscriptionArn'] = client.subscribe(**api_params)
+                changed = True
+            except (ClientError, ParamValidationError, MissingParametersError) as e:
+                module.fail_json(msg='Error creating SNS event mapping for lambda: {0}'.format(e))
+
+
+    else:
+        if current_state == 'present':
+            # remove subscription
+            api_params = dict(SubscriptionArn=current_subscription['SubscriptionArn'])
+            try:
+                if not module.check_mode:
+                    client.unsubscribe(**api_params)
+                current_subscription = dict()
+                changed = True
+            except (ClientError, ParamValidationError, MissingParametersError) as e:
+                module.fail_json(msg='Error removing SNS event mapping for lambda: {0}'.format(e))
+
+            # remove policy associated with this event mapping 
+            policy = dict(
+                statement_id=source_params['id'],
+            )
+            assert_policy_state(module, aws, policy, present=False)
+
+    return dict(changed=changed, ansible_facts=dict(lambda_sns_events=current_subscription))
+
+
 # ---------------------------------------------------------------------------------------------------
 #
 #   MAIN

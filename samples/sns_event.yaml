@@ -13,7 +13,7 @@
       source_params:
         id: lambda-sns-topic-notify
         topic_arn: arn:aws:sns:us-east-1:469333712854:sns-lambda
-        enabled: True
+        # enabled: True
 
   - name: show source event cnfig
     debug: var=lambda_sns_events
