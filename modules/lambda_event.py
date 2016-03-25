@@ -144,7 +144,7 @@ EXAMPLES = '''
         id: lambda-sns-topic-notify
         topic_arn: arn:aws:sns:us-east-1:123456789012:sns-some-topic
 
-  - name: show source event config
+  - name: show SNS event mapping
     debug: var=lambda_sns_event
 
 '''
