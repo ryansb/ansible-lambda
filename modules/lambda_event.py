@@ -32,8 +32,9 @@ DOCUMENTATION = '''
 module: lambda_event
 short_description: Creates, updates or deletes AWS Lambda function event mappings.
 description:
-    - This module allows the management of AWS Lambda function event source mappings such as S3 bucket
-      events, DynamoDB and Kinesis streaming events via the Ansible framework.
+    - This module allows the management of AWS Lambda function event source mappings such as DynamoDB and Kinesis stream
+      events via the Ansible framework. These event source mappings are relevant only in the AWS Lambda pull model, where
+      AWS Lambda invokes the function.
       It is idempotent and supports "Check" mode.  Use module M(lambda) to manage the lambda
       function itself and M(lambda_alias) to manage function aliases.
 version_added: "2.1"
@@ -66,12 +67,6 @@ options:
   source_params:
     description:
       -  Sub-parameters required for event source.
-      -  I(== S3 event source ==)
-      -  C(id) Unique ID for this source event.
-      -  C(bucket) Name of source bucket.
-      -  C(prefix) Bucket prefix (e.g. images/)
-      -  C(suffix) Bucket suffix (e.g. log)
-      -  C(events) List of events (e.g. ['s3:ObjectCreated:Put'])
       -  I(== stream event source ==)
       -  C(source_arn) The Amazon Resource Name (ARN) of the Kinesis or DynamoDB stream that is the event source.
       -  C(enabled) Indicates whether AWS Lambda should begin polling the event source. Default is True.
@@ -79,9 +74,6 @@ options:
          time of invoking your function. Default is 100.
       -  C(starting_position) The position in the stream where AWS Lambda should start reading.
          Choices are TRIM_HORIZON or LATEST.
-      -  I(== SNS event source ==)
-      -  C(id) Unique ID for this source event.
-      -  C(topic_arn) The ARN of the topic to which you want to subscribe the lambda function.
     required: true
 requirements:
     - boto3
@@ -92,26 +84,6 @@ extends_documentation_fragment:
 
 EXAMPLES = '''
 ---
-# Simple example that creates a lambda event notification for an S3 bucket
-- hosts: localhost
-  gather_facts: no
-  vars:
-    state: present
-  tasks:
-  - name: S3 event mapping
-    lambda_event:
-      state: "{{ state | default('present') }}"
-      event_source: s3
-      function_name: ingestData
-      alias: Dev
-      source_params:
-        id: lambda-s3-myBucket-create-data-log
-        bucket: buzz-scanner
-        prefix: twitter
-        suffix: log
-        events:
-        - s3:ObjectCreated:Put
-
 # Example that creates a lambda event notification for a DynamoDB stream
 - hosts: localhost
   gather_facts: no
@@ -132,38 +104,14 @@ EXAMPLES = '''
 
   - name: show source event
     debug: var=lambda_stream_events
-
-# example of SNS topic
-  - name: SNS event mapping
-    lambda_event:
-      state: "{{ state | default('present') }}"
-      event_source: sns
-      function_name: SaveMessage
-      alias: Prod
-      source_params:
-        id: lambda-sns-topic-notify
-        topic_arn: arn:aws:sns:us-east-1:123456789012:sns-some-topic
-
-  - name: show SNS event mapping
-    debug: var=lambda_sns_event
-
 '''
 
 RETURN = '''
 ---
-lambda_s3_events:
-    description: list of dictionaries returned by the API describing S3 event mappings
-    returned: success
-    type: list
 lambda_stream_events:
     description: list of dictionaries returned by the API describing stream event mappings
     returned: success
     type: list
-lambda_sns_event:
-    description: dictionary returned by the API describing SNS event mapping
-    returned: success
-    type: dict
-
 '''
 
 # ---------------------------------------------------------------------------------------------------
@@ -245,7 +193,7 @@ def set_api_sub_params(params):
     """
     Sets module sub-parameters to those expected by the boto3 API.
 
-    :param module_params:
+    :param params:
     :return:
     """
 
@@ -437,14 +385,14 @@ def remove_policy_permission(module, aws, statement_id):
 #   Lambda Event Handlers
 #
 #   This section defines a lambda_event_X function where X is an AWS service capable of initiating
-#   the execution of a Lambda function.
+#   the execution of a Lambda function (pull only).
 #
 # ---------------------------------------------------------------------------------------------------
 
 
 def lambda_event_stream(module, aws):
     """
-    Adds, updates or deletes lambda stream (DynamoDb, Kinesis) envent notifications.
+    Adds, updates or deletes lambda stream (DynamoDb, Kinesis) event notifications.
     :param module:
     :param aws:
     :return:
@@ -556,232 +504,11 @@ def lambda_event_stream(module, aws):
     return dict(changed=changed, ansible_facts=dict(lambda_stream_events=facts))
 
 
-def lambda_event_s3(module, aws):
-    """
-    Adds, updates or deletes lambda s3 event notifications.
-
-    :param module: Ansible module reference
-    :param aws:
-    :return dict:
-    """
-
-    client = aws.client('s3')
-    api_params = dict()
-    changed = False
-    current_state = 'absent'
-    state = module.params['state']
-
-    # check if required sub-parameters are present
-    source_params = module.params['source_params']
-    if not source_params.get('id'):
-        module.fail_json(msg="Source parameter 'id' is required for S3 event notification.")
-
-    if source_params.get('bucket'):
-        api_params = dict(Bucket=source_params['bucket'])
-    else:
-        module.fail_json(msg="Source parameter 'bucket' is required for S3 event notification.")
-
-    # check if event notifications exist
-    try:
-        facts = client.get_bucket_notification_configuration(**api_params)
-        facts.pop('ResponseMetadata')
-    except ClientError as e:
-        module.fail_json(msg='Error retrieving s3 event notification configuration: {0}'.format(e))
-
-    current_lambda_configs = list()
-    matching_id_config = dict()
-    if 'LambdaFunctionConfigurations' in facts:
-        current_lambda_configs = facts.pop('LambdaFunctionConfigurations')
-
-        for config in current_lambda_configs:
-            if config['Id'] == source_params['id']:
-                matching_id_config = config
-                current_lambda_configs.remove(config)
-                current_state = 'present'
-                break
-
-    if state == 'present':
-        # build configurations
-        new_configuration = dict(Id=source_params.get('id'))
-        new_configuration.update(LambdaFunctionArn=module.params['lambda_function_arn'])
-
-        filter_rules = []
-        if source_params.get('prefix'):
-            filter_rules.append(dict(Name='Prefix', Value=str(source_params.get('prefix'))))
-        if source_params.get('suffix'):
-            filter_rules.append(dict(Name='Suffix', Value=str(source_params.get('suffix'))))
-        if filter_rules:
-            new_configuration.update(Filter=dict(Key=dict(FilterRules=filter_rules)))
-        if source_params.get('events'):
-            new_configuration.update(Events=source_params['events'])
-
-        if current_state == 'present':
-
-            # check if source event configuration has changed
-            if ordered_obj(matching_id_config) == ordered_obj(new_configuration):
-                current_lambda_configs.append(matching_id_config)
-            else:
-                # update s3 event notification for lambda
-                current_lambda_configs.append(new_configuration)
-                facts.update(LambdaFunctionConfigurations=current_lambda_configs)
-                api_params = dict(NotificationConfiguration=facts, Bucket=source_params['bucket'])
-
-                try:
-                    if not module.check_mode:
-                        client.put_bucket_notification_configuration(**api_params)
-                    changed = True
-                except (ClientError, ParamValidationError, MissingParametersError) as e:
-                    module.fail_json(msg='Error updating s3 event notification for lambda: {0}'.format(e))
-
-        else:
-            # add policy permission before creating the event notification
-            policy = dict(
-                statement_id=source_params['id'],
-                action='lambda:InvokeFunction',
-                principal='s3.amazonaws.com',
-                source_arn='arn:aws:s3:::{0}'.format(source_params['bucket']),
-                source_account=aws.account_id,
-            )
-            assert_policy_state(module, aws, policy, present=True)
-
-            # create s3 event notification for lambda
-            current_lambda_configs.append(new_configuration)
-            facts.update(LambdaFunctionConfigurations=current_lambda_configs)
-            api_params = dict(NotificationConfiguration=facts, Bucket=source_params['bucket'])
-
-            try:
-                if not module.check_mode:
-                    client.put_bucket_notification_configuration(**api_params)
-                changed = True
-            except (ClientError, ParamValidationError, MissingParametersError) as e:
-                module.fail_json(msg='Error creating s3 event notification for lambda: {0}'.format(e))
-
-    else:
-        # state = 'absent'
-        if current_state == 'present':
-
-            # delete the lambda event notifications
-            if current_lambda_configs:
-                facts.update(LambdaFunctionConfigurations=current_lambda_configs)
-
-            api_params.update(NotificationConfiguration=facts)
-
-            try:
-                if not module.check_mode:
-                    client.put_bucket_notification_configuration(**api_params)
-                changed = True
-            except (ClientError, ParamValidationError, MissingParametersError) as e:
-                module.fail_json(msg='Error removing s3 source event configuration: {0}'.format(e))
-
-            policy = dict(
-                statement_id=source_params['id'],
-            )
-            assert_policy_state(module, aws, policy, present=False)
-
-    return dict(changed=changed, ansible_facts=dict(lambda_s3_events=current_lambda_configs))
-
-
-def lambda_event_sns(module, aws):
-    """
-    Adds, updates or deletes lambda sns event notifications.
-
-    :param module: Ansible module reference
-    :param aws:
-    :return dict:
-    """
-
-    client = aws.client('sns')
-    api_params = dict()
-    changed = False
-    current_state = 'absent'
-    state = module.params['state']
-
-    # check if required sub-parameters are present
-    source_params = module.params['source_params']
-    if not source_params.get('id'):
-        module.fail_json(msg="Source parameter 'id' is required for SNS event.")
-
-    if source_params.get('topic_arn'):
-        api_params = dict(TopicArn=source_params['topic_arn'])
-    else:
-        module.fail_json(msg="Source parameter 'topic_arn' is required for SNS event.")
-
-    # check if SNS subscription exists
-    current_subscription = dict()
-    endpoint = module.params['lambda_function_arn']
-    try:
-        while not current_subscription:
-            facts = client.list_subscriptions_by_topic(**api_params)
-            for subscription in facts.get('Subscriptions', []):
-                if subscription['Endpoint'] == endpoint:
-                    current_subscription = subscription
-                    current_state = 'present'
-                    break
-
-            # if there are more than 100 subscriptions, NextToken will be present so if
-            # subscription is not found yet, get next block starting at NextToken
-            if 'NextToken' in facts and not current_subscription:
-                api_params.update(NextToken=facts['NextToken'])
-            else:
-                break
-
-    except (ClientError, ParamValidationError, MissingParametersError) as e:
-        module.fail_json(msg='Error retrieving SNS subscriptions: {0}'.format(e))
-
-    if state == 'present':
-        if current_state == 'present':
-            # subscription cannot be updated so nothing to do here
-            pass
-        else:
-            # add policy permission before creating the subscription
-            policy = dict(
-                statement_id=source_params['id'],
-                action='lambda:InvokeFunction',
-                principal='sns.amazonaws.com',
-                source_arn=source_params['topic_arn'],
-            )
-            assert_policy_state(module, aws, policy, present=True)
-
-            # create subscription
-            api_params = dict(
-                TopicArn=source_params['topic_arn'],
-                Endpoint=endpoint,
-                Protocol='lambda'
-            )
-            try:
-                if not module.check_mode:
-                    current_subscription = client.subscribe(**api_params)
-                changed = True
-            except (ClientError, ParamValidationError, MissingParametersError) as e:
-                module.fail_json(msg='Error creating SNS event mapping for lambda: {0}'.format(e))
-
-    else:
-        if current_state == 'present':
-            # remove subscription
-            api_params = dict(SubscriptionArn=current_subscription['SubscriptionArn'])
-            try:
-                if not module.check_mode:
-                    client.unsubscribe(**api_params)
-                current_subscription = dict()
-                changed = True
-            except (ClientError, ParamValidationError, MissingParametersError) as e:
-                module.fail_json(msg='Error removing SNS event mapping for lambda: {0}'.format(e))
-
-            # remove policy associated with this event mapping 
-            policy = dict(
-                statement_id=source_params['id'],
-            )
-            assert_policy_state(module, aws, policy, present=False)
-
-    return dict(changed=changed, ansible_facts=dict(lambda_sns_event=current_subscription))
-
-
 # ---------------------------------------------------------------------------------------------------
 #
 #   MAIN
 #
 # ---------------------------------------------------------------------------------------------------
-
 
 def main():
     """
@@ -816,7 +543,7 @@ def main():
     if not HAS_BOTO3:
         module.fail_json(msg='Both boto3 & boto are required for this module.')
 
-    aws = AWSConnection(module, ['lambda', 's3', 'sns'])
+    aws = AWSConnection(module, ['lambda'])
 
     validate_params(module, aws)
 

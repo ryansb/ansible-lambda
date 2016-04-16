@@ -128,7 +128,9 @@ Use to create, update or delete lambda function aliases.
 
 ### lambda_event:
 ___
-Use to create, update or delete lambda function source event mappings, which include Kinesis/DynamoDB streams, S3 events and SNS topics.
+Use to create, update or delete lambda function source event mappings, which include Kinesis and DynamoDB streams.
+_Note:_  The handling of "push model" events such as S3 events and SNS topics has been removed and should have their
+own modules eventually.  Until then, the orginal *lambda_event* module can be found [here.](https://github.com/pjodouin/ansible-repo/tree/master/library)
 
 ##### Example Playbook
 ```yaml
@@ -137,23 +139,6 @@ Use to create, update or delete lambda function source event mappings, which inc
   vars:
     state: present
   tasks:
-  - name: S3 event mapping
-    lambda_event:
-      state: "{{ state | default('present') }}"
-      event_source: s3
-      function_name: ingestData
-      alias: Dev
-      source_params:
-        id: lambda-s3-myBucket-create-data-log
-        bucket: buzz-scanner
-        prefix: twitter
-        suffix: log
-        events:
-        - s3:ObjectCreated:Put
-
-  - name: show source event config
-    debug: var=lambda_s3_events
-
   - name: DynamoDB stream event mapping
     lambda_event:
       state: "{{ state | default('present') }}"
@@ -168,19 +153,6 @@ Use to create, update or delete lambda function source event mappings, which inc
 
   - name: show source event config
     debug: var=lambda_stream_events
-
-  - name: SNS event mapping
-    lambda_event:
-      state: "{{ state | default('present') }}"
-      event_source: sns
-      function_name: SaveMessage
-      alias: Prod
-      source_params:
-        id: lambda-sns-topic-notify
-        topic_arn: arn:aws:sns:us-east-1:123456789012:sns-some-topic
-
-  - name: show SNS event mapping
-    debug: var=lambda_sns_event
 
 ```
 
