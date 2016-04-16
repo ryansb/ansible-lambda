@@ -1,7 +1,7 @@
 # Ansible Cloud Modules & Plugins for AWS Lambda
 #### Version 0.6 [![Build Status](https://travis-ci.org/pjodouin/ansible-lambda.svg)](https://travis-ci.org/pjodouin/ansible-lambda)
 
-These modules help manage AWS Lambda resources including code, configuration, aliases, versions and event source mappings, which currently include S3, DynamoDB streams, Kinesis streams and SNS topics. A lookup plugin is also included which allows looking up values via a Lambda function.
+These modules help manage AWS Lambda resources including code, configuration, aliases, versions and event source mappings, including DynamoDB and Kinesis streams. A lookup plugin is also included which allows looking up values via a Lambda function.
 
 
 *Note:*  A [pull request](https://github.com/ansible/ansible-modules-extras/pull/1890) for these modules has now been submitted for inclusion in _ansible-module-extras_ and is awaiting community review.
