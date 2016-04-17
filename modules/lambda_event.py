@@ -256,130 +256,6 @@ def get_qualifier(module):
     return qualifier
 
 
-def assert_policy_state(module, aws, policy, present=False):
-    """
-    Asserts the desired policy statement is present/absent and adds/removes it accordingly.
-
-    :param module:
-    :param aws:
-    :param policy:
-    :param present:
-    :return:
-    """
-
-    changed = False
-    currently_present = get_policy_state(module, aws, policy['statement_id'])
-
-    if present:
-        if not currently_present:
-            changed = add_policy_permission(module, aws, policy)
-    else:
-        if currently_present:
-            changed = remove_policy_permission(module, aws, policy['statement_id'])
-
-    return changed
-
-
-def get_policy_state(module, aws, sid):
-    """
-    Checks that policy exists and if so, that statement ID is present or absent.
-
-    :param module:
-    :param aws:
-    :param sid:
-    :return:
-    """
-
-    client = aws.client('lambda')
-    policy = dict()
-    present = False
-
-    # set API parameters
-    api_params = dict(FunctionName=module.params['lambda_function_arn'])
-    qualifier = get_qualifier(module)
-    if qualifier:
-        api_params.update(Qualifier=qualifier)
-
-    # check if function policy exists
-    try:
-        # get_policy returns a JSON string so must convert to dict before reassigning to its key
-        policy_results = client.get_policy(**api_params)
-        policy = json.loads(policy_results.get('Policy', '{}'))
-
-    except (ClientError, ParamValidationError, MissingParametersError) as e:
-        if not e.response['Error']['Code'] == 'ResourceNotFoundException':
-            module.fail_json(msg='Error retrieving function policy: {0}'.format(e))
-
-    if 'Statement' in policy:
-        # now that we have the policy, check if required permission statement is present
-        for statement in policy['Statement']:
-            if statement['Sid'] == sid:
-                present = True
-                break
-
-    return present
-
-
-def add_policy_permission(module, aws, policy_statement):
-    """
-    Adds a permission statement to the policy.
-
-    :param module:
-    :param aws:
-    :param policy_statement:
-    :return:
-    """
-
-    client = aws.client('lambda')
-    changed = False
-
-    # set API parameters
-    api_params = dict(FunctionName=module.params['lambda_function_arn'])
-    api_params.update(set_api_sub_params(policy_statement))
-    qualifier = get_qualifier(module)
-    if qualifier:
-        api_params.update(Qualifier=qualifier)
-
-    try:
-        if not module.check_mode:
-            client.add_permission(**api_params)
-        changed = True
-    except (ClientError, ParamValidationError, MissingParametersError) as e:
-        module.fail_json(msg='Error adding permission to policy: {0}'.format(e))
-
-    return changed
-
-
-def remove_policy_permission(module, aws, statement_id):
-    """
-    Removed a permission statement from the policy.
-
-    :param module:
-    :param aws:
-    :param statement_id:
-    :return:
-    """
-
-    client = aws.client('lambda')
-    changed = False
-
-    # set API parameters
-    api_params = dict(FunctionName=module.params['lambda_function_arn'])
-    api_params.update(StatementId=statement_id)
-    qualifier = get_qualifier(module)
-    if qualifier:
-        api_params.update(Qualifier=qualifier)
-
-    try:
-        if not module.check_mode:
-            client.remove_permission(**api_params)
-        changed = True
-    except (ClientError, ParamValidationError, MissingParametersError) as e:
-        module.fail_json(msg='Error removing permission from policy: {0}'.format(e))
-
-    return changed
-
-
 # ---------------------------------------------------------------------------------------------------
 #
 #   Lambda Event Handlers
@@ -388,7 +264,6 @@ def remove_policy_permission(module, aws, statement_id):
 #   the execution of a Lambda function (pull only).
 #
 # ---------------------------------------------------------------------------------------------------
-
 
 def lambda_event_stream(module, aws):
     """
