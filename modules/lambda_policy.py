@@ -57,11 +57,11 @@ options:
       -  Version of the Lambda function. Mutually exclusive with C(alias).
     required: false
 
-  xx-parameter-xx
+  xx-parameter-xx:
     description:
       -  A desc....
     required: true
-    default:
+    default: none
     choices: []
     aliases: []
 
