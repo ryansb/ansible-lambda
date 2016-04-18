@@ -39,31 +39,64 @@ author: Pierre Jodouin (@pjodouin)
 options:
   function_name:
     description:
-      - The name or ARN of the lambda function.
+      - Name of the Lambda function whose resource policy you are updating by adding a new permission.
+      - "You can specify a function name (for example, Thumbnail ) or you can specify Amazon Resource Name (ARN) of the function (for example, arn:aws:lambda:us-west-2:account-id:function:ThumbNail ). AWS Lambda also allows you to specify partial ARN (for example, account-id:Thumbnail ). Note that the length constraint applies only to the ARN. If you specify only the function name, it is limited to 64 character in length."
     required: true
     aliases: ['lambda_function_arn', 'function_arn']
+
   state:
     description:
       - Describes the desired state and defaults to "present".
     required: true
     default: "present"
     choices: ["present", "absent"]
+
   alias:
     description:
       - Name of the function alias. Mutually exclusive with C(version).
     required: true
+
   version:
     description:
       -  Version of the Lambda function. Mutually exclusive with C(alias).
     required: false
 
-  xx-parameter-xx:
+  statement_id:
     description:
-      -  A desc....
+      -  A unique statement identifier.
     required: true
     default: none
-    choices: []
-    aliases: []
+    aliases: ['sid']
+
+  action:
+    description:
+      -  "The AWS Lambda action you want to allow in this statement. Each Lambda action is a string starting with lambda: followed by the API name (see Operations ). For example, lambda:CreateFunction . You can use wildcard (lambda:* ) to grant permission for all AWS Lambda actions."
+    required: true
+    default: none
+
+  principal:
+    description:
+      -  "The principal who is getting this permission. It can be Amazon S3 service Principal (s3.amazonaws.com ) if you want Amazon S3 to invoke the function, an AWS account ID if you are granting cross-account permission, or any valid AWS service principal such as sns.amazonaws.com . For example, you might want to allow a custom application in another AWS account to push events to AWS Lambda by invoking your function."
+    required: true
+    default: none
+
+  source_arn:
+    description:
+      -  This is optional; however, when granting Amazon S3 permission to invoke your function, you should specify this field with the bucket Amazon Resource Name (ARN) as its value. This ensures that only events generated from the specified bucket can invoke the function.
+    required: false
+    default: none
+
+  source_account:
+    description:
+      -  The AWS account ID (without a hyphen) of the source owner. For example, if the SourceArn identifies a bucket, then this is the bucket owner's account ID. You can use this additional condition to ensure the bucket you specify is owned by a specific account (it is possible the bucket owner deleted the bucket and some other AWS account created the bucket). You can also use this condition to specify all sources (that is, you don't specify the SourceArn ) owned by a specific account.
+    required: false
+    default: none
+
+  event_source_token:
+    description:
+      -  "String" as described in the boto3 documentation.
+    required: false
+    default: none
 
 requirements:
     - boto3
