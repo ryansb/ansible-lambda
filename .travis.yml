@@ -9,4 +9,5 @@ script:
 - python -m compileall modules/*.py
 - python -m compileall plugins/lookup/*.py
 - nosetests
-
+notifications:
+  slack: virtualcomputing:sE3KduFaTBjq0jGEwPdxs0Qr
