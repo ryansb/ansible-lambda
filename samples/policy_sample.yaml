@@ -1,0 +1,21 @@
+---
+- hosts: localhost
+  gather_facts: no
+  vars:
+    state: present
+  tasks:
+  - name: Lambda S3 event notification
+    lambda_policy:
+      state: "{{ state | default('present') }}"
+      function_name: functionName
+      alias: Dev
+      statement_id: lambda-s3-myBucket-create-data-log
+      action: lambda:InvokeFunction
+      principle: s3.amazonaws.com
+      source_arn: arn:aws:s3:*:*:bucketName
+      source_account: 123456789012
+#      event_source_token:
+
+  - name: show results
+    debug: var=lambda_policy
+
