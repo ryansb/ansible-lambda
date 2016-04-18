@@ -94,7 +94,7 @@ options:
 
   event_source_token:
     description:
-      -  'String' as described in the boto3 documentation.
+      -  Some string, as described in the boto3 documentation.
     required: false
     default: none
 
