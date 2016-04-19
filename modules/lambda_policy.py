@@ -14,7 +14,6 @@
 # You should have received a copy of the GNU General Public License
 # along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
 
-import sys
 import json
 
 try:
@@ -33,7 +32,10 @@ short_description: Creates, updates or deletes AWS Lambda policy statements.
 description:
     - This module allows the management of AWS Lambda policy statements.
       It is idempotent and supports "Check" mode.  Use module M(lambda) to manage the lambda
-      function itself and M(lambda_alias) to manage function aliases.
+      function itself, M(lambda_alias) to manage function aliases, M(lambda_event) to manage event source mappings
+      such as Kinesis streams, M(lambda_invoke) to execute a lambda function and M(lambda_facts) to gather facts
+      relating to one or more lambda functions.
+
 version_added: "2.1"
 author: Pierre Jodouin (@pjodouin)
 options:
@@ -108,7 +110,7 @@ options:
 
   event_source_token:
     description:
-      -  Some string, as described in the boto3 documentation.
+      -  Token string representing source ARN or account. Mutually exclusive with C(source_arn) or C(source_account).
     required: false
     default: none
 
@@ -138,16 +140,16 @@ EXAMPLES = '''
       source_account: 123456789012
 
   - name: show results
-    debug: var=lambda_policy
+    debug: var=lambda_policy_action
 
 '''
 
 RETURN = '''
 ---
-lambda_policy:
-    description: dictionary returned by the API describing the trust policy
+lambda_policy_action:
+    description: describes what action was taken
     returned: success
-    type: dict
+    type: string
 '''
 
 # ---------------------------------------------------------------------------------------------------
@@ -207,22 +209,6 @@ def pc(key):
     """
 
     return "".join([token.capitalize() for token in key.split('_')])
-
-
-def ordered_obj(obj):
-    """
-    Order object for comparison purposes
-
-    :param obj:
-    :return:
-    """
-
-    if isinstance(obj, dict):
-        return sorted((k, ordered_obj(v)) for k, v in obj.items())
-    if isinstance(obj, list):
-        return sorted(ordered_obj(x) for x in obj)
-    else:
-        return obj
 
 
 def policy_equal(module, current_statement):
@@ -332,7 +318,8 @@ def get_policy_statement(module, aws):
             module.fail_json(msg='Error retrieving function policy: {0}'.format(e))
 
     if 'Statement' in policy:
-        # now that we have the policy, check if required permission statement is present
+        # Now that we have the policy, check if required permission statement is present and flatten to
+        # simple dictionary if found.
         for statement in policy['Statement']:
             if statement['Sid'] == sid:
                 policy_statement['action'] = statement['Action']
@@ -416,6 +403,7 @@ def manage_state(module, aws):
     changed = False
     current_state = 'absent'
     state = module.params['state']
+    action_taken = 'none'
 
     # check if the policy exists
     current_policy_statement = get_policy_statement(module, aws)
@@ -429,15 +417,18 @@ def manage_state(module, aws):
             if not policy_equal(module, current_policy_statement):
                 remove_policy_permission(module, aws)
                 changed = add_policy_permission(module, aws)
+                action_taken = 'updated'
         else:
             # add policy statement
             changed = add_policy_permission(module, aws)
+            action_taken = 'added'
     else:
         if current_state == 'present':
             # remove the policy statement
             changed = remove_policy_permission(module, aws)
+            action_taken = 'deleted'
 
-    return dict(changed=changed, ansible_facts=dict(lambda_policy=current_policy_statement))
+    return dict(changed=changed, ansible_facts=dict(lambda_policy_action=action_taken))
 
 
 # ---------------------------------------------------------------------------------------------------

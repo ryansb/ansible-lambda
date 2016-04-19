@@ -4,7 +4,7 @@
   vars:
     state: present
   tasks:
-  - name: Lambda S3 event notification
+  - name: Lambda policy for S3 event notifications
     lambda_policy:
       state: "{{ state | default('present') }}"
       function_name: functionName
@@ -15,7 +15,4 @@
       source_arn: arn:aws:s3:eu-central-1:123456789012:bucketName
       source_account: 123456789012
 #      event_source_token:
-
-  - name: show results
-    debug: var=lambda_policy
 

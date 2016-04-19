@@ -1,10 +1,13 @@
 # Ansible Cloud Modules & Plugins for AWS Lambda
-#### Version 0.6 [![Build Status](https://travis-ci.org/pjodouin/ansible-lambda.svg)](https://travis-ci.org/pjodouin/ansible-lambda)
+#### Version 0.7 [![Build Status](https://travis-ci.org/pjodouin/ansible-lambda.svg)](https://travis-ci.org/pjodouin/ansible-lambda)
 
-These modules help manage AWS Lambda resources including code, configuration, aliases, versions and event source mappings, including DynamoDB and Kinesis streams. A lookup plugin is also included which allows looking up values via a Lambda function.
+These modules help manage AWS Lambda resources including code, configuration, aliases, versions, policy statements and
+ event source mappings, including DynamoDB and Kinesis streams. A lookup plugin is also included which allows looking
+ up values via a Lambda function.
 
 
-*Note:*  A [pull request](https://github.com/ansible/ansible-modules-extras/pull/1890) for these modules has now been submitted for inclusion in _ansible-module-extras_ and is awaiting community review.
+*Note:*  A [pull request](https://github.com/ansible/ansible-modules-extras/pull/1890) for these modules has now been
+ submitted for inclusion in _ansible-module-extras_ and is awaiting community review.
 
 ## Requirements
 - python >= 2.6
@@ -14,7 +17,7 @@ These modules help manage AWS Lambda resources including code, configuration, al
 
 ## Modules
 ### lambda_facts:
-___
+
 Gathers facts related to AWS Lambda functions.
 
 ##### Example Command
@@ -37,9 +40,9 @@ Gathers facts related to AWS Lambda functions.
 - name: show Lambda facts
   debug: var=Versions
 ```
-
-### lambda:
 ___
+### lambda:
+
 Use to create, update or delete lambda functions and publish versions.
 
 ##### Example Playbook
@@ -77,9 +80,9 @@ Use to create, update or delete lambda functions and publish versions.
     debug: var=lambda_facts
 
 ```
-
-### lambda_alias:
 ___
+### lambda_alias:
+
 Use to create, update or delete lambda function aliases.
 
 ##### Example Playbook
@@ -125,9 +128,9 @@ Use to create, update or delete lambda function aliases.
     when: lambda_facts.Version != "$LATEST"
 
 ```
-
-### lambda_event:
 ___
+### lambda_event:
+
 Use to create, update or delete lambda function source event mappings, which include Kinesis and DynamoDB streams.
 _Note:_  The handling of "push model" events such as S3 events and SNS topics has been removed and should have their
 own modules eventually.  Until then, the orginal *lambda_event* module can be found [here.](https://github.com/pjodouin/ansible-repo/tree/master/library)
@@ -155,10 +158,34 @@ own modules eventually.  Until then, the orginal *lambda_event* module can be fo
     debug: var=lambda_stream_events
 
 ```
-
-
-### lambda_invoke:
 ___
+### lambda_policy
+
+This module allows the management of AWS Lambda policy statements. It is idempotent and supports "Check" mode.
+
+##### Example Playbook
+```yaml
+- hosts: localhost
+  gather_facts: no
+  vars:
+    state: present
+  tasks:
+  - name: Lambda policy for S3 event notifications
+    lambda_policy:
+      state: "{{ state | default('present') }}"
+      function_name: functionName
+      alias: Dev
+      statement_id: lambda-s3-myBucket-create-data-log
+      action: lambda:InvokeFunction
+      principal: s3.amazonaws.com
+      source_arn: arn:aws:s3:eu-central-1:123456789012:bucketName
+      source_account: 123456789012
+#      event_source_token:
+
+```
+___
+### lambda_invoke:
+
 Use to invoke a specific Lambda function.
 
 ##### Example Command
@@ -167,7 +194,7 @@ Use to invoke a specific Lambda function.
 
 ## Plugins
 ### lambda (lookup):
-___
+
 Returns value(s) by invoking a lambda function.
 
 ##### Example Playbook
