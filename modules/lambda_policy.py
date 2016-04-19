@@ -40,7 +40,10 @@ options:
   function_name:
     description:
       - Name of the Lambda function whose resource policy you are updating by adding a new permission.
-      - "You can specify a function name (for example, Thumbnail ) or you can specify Amazon Resource Name (ARN) of the function (for example, arn:aws:lambda:us-west-2:account-id:function:ThumbNail ). AWS Lambda also allows you to specify partial ARN (for example, account-id:Thumbnail ). Note that the length constraint applies only to the ARN. If you specify only the function name, it is limited to 64 character in length."
+      - "You can specify a function name (for example, Thumbnail ) or you can specify Amazon Resource Name (ARN) of the
+        function (for example, arn:aws:lambda:us-west-2:account-id:function:ThumbNail ). AWS Lambda also allows you to
+        specify partial ARN (for example, account-id:Thumbnail ). Note that the length constraint applies only to the
+        ARN. If you specify only the function name, it is limited to 64 character in length."
     required: true
     aliases: ['lambda_function_arn', 'function_arn']
 
@@ -70,25 +73,36 @@ options:
 
   action:
     description:
-      -  "The AWS Lambda action you want to allow in this statement. Each Lambda action is a string starting with lambda: followed by the API name (see Operations ). For example, lambda:CreateFunction . You can use wildcard (lambda:* ) to grant permission for all AWS Lambda actions."
+      -  "The AWS Lambda action you want to allow in this statement. Each Lambda action is a string starting with
+         lambda: followed by the API name (see Operations ). For example, lambda:CreateFunction . You can use wildcard
+         (lambda:* ) to grant permission for all AWS Lambda actions."
     required: true
     default: none
 
   principal:
     description:
-      -  "The principal who is getting this permission. It can be Amazon S3 service Principal (s3.amazonaws.com ) if you want Amazon S3 to invoke the function, an AWS account ID if you are granting cross-account permission, or any valid AWS service principal such as sns.amazonaws.com . For example, you might want to allow a custom application in another AWS account to push events to AWS Lambda by invoking your function."
+      -  "The principal who is getting this permission. It can be Amazon S3 service Principal (s3.amazonaws.com ) if
+         you want Amazon S3 to invoke the function, an AWS account ID if you are granting cross-account permission, or
+         any valid AWS service principal such as sns.amazonaws.com . For example, you might want to allow a custom
+         application in another AWS account to push events to AWS Lambda by invoking your function."
     required: true
     default: none
 
   source_arn:
     description:
-      -  This is optional; however, when granting Amazon S3 permission to invoke your function, you should specify this field with the bucket Amazon Resource Name (ARN) as its value. This ensures that only events generated from the specified bucket can invoke the function.
+      -  This is optional; however, when granting Amazon S3 permission to invoke your function, you should specify this
+         field with the bucket Amazon Resource Name (ARN) as its value. This ensures that only events generated from
+         the specified bucket can invoke the function.
     required: false
     default: none
 
   source_account:
     description:
-      -  The AWS account ID (without a hyphen) of the source owner. For example, if the SourceArn identifies a bucket, then this is the bucket owner's account ID. You can use this additional condition to ensure the bucket you specify is owned by a specific account (it is possible the bucket owner deleted the bucket and some other AWS account created the bucket). You can also use this condition to specify all sources (that is, you don't specify the SourceArn ) owned by a specific account.
+      -  The AWS account ID (without a hyphen) of the source owner. For example, if the SourceArn identifies a bucket,
+         then this is the bucket owner's account ID. You can use this additional condition to ensure the bucket you
+         specify is owned by a specific account (it is possible the bucket owner deleted the bucket and some other AWS
+         account created the bucket). You can also use this condition to specify all sources (that is, you don't
+         specify the SourceArn ) owned by a specific account.
     required: false
     default: none
 
@@ -119,8 +133,8 @@ EXAMPLES = '''
       alias: Dev
       statement_id: lambda-s3-myBucket-create-data-log
       action: lambda:InvokeFunction
-      principle: s3.amazonaws.com
-      source_arn: arn:aws:s3:*:*:bucketName
+      principal: s3.amazonaws.com
+      source_arn: arn:aws:s3:eu-central-1:123456789012:bucketName
       source_account: 123456789012
 
   - name: show results
@@ -211,6 +225,18 @@ def ordered_obj(obj):
         return obj
 
 
+def policy_equal(module, current_statement):
+
+    equal = True
+
+    for param in ('action', 'principal', 'source_arn', 'source_account', 'event_source_token'):
+        if module.params.get(param) != current_statement.get(param):
+            equal = False
+            break
+
+    return equal
+
+
 def set_api_params(module, module_params):
     """
     Sets module parameters to those expected by the boto3 API.
@@ -249,16 +275,6 @@ def validate_params(module, aws):
     if len(function_name) > 64:
         module.fail_json(msg='Function name "{0}" exceeds 64 character limit'.format(function_name))
 
-    # # check if 'function_name' needs to be expanded in full ARN format
-    # if not module.params['lambda_function_arn'].startswith('arn:aws:lambda:'):
-    #     function_name = module.params['lambda_function_arn']
-    #     module.params['lambda_function_arn'] = 'arn:aws:lambda:{0}:{1}:function:{2}'.format(aws.region, aws.account_id, function_name)
-    #
-    # qualifier = get_qualifier(module)
-    # if qualifier:
-    #     function_arn = module.params['lambda_function_arn']
-    #     module.params['lambda_function_arn'] = '{0}:{1}'.format(function_arn, qualifier)
-
     return
 
 
@@ -279,29 +295,11 @@ def get_qualifier(module):
     return qualifier
 
 
-# def assert_policy_state(module, aws, policy, present=False):
-#     """
-#     Asserts the desired policy statement is present/absent and adds/removes it accordingly.
+# ---------------------------------------------------------------------------------------------------
 #
-#     :param module:
-#     :param aws:
-#     :param policy:
-#     :param present:
-#     :return:
-#     """
+#   Lambda policy permission functions
 #
-#     changed = False
-#     currently_present = get_policy_state(module, aws, policy['statement_id'])
-#
-#     if present:
-#         if not currently_present:
-#             changed = add_policy_permission(module, aws, policy)
-#     else:
-#         if currently_present:
-#             changed = remove_policy_permission(module, aws, policy['statement_id'])
-#
-#     return changed
-
+# ---------------------------------------------------------------------------------------------------
 
 def get_policy_statement(module, aws):
     """
@@ -318,7 +316,7 @@ def get_policy_statement(module, aws):
     sid = module.params['statement_id']
 
     # set API parameters
-    api_params = dict(FunctionName=module.params['function_name'])
+    api_params = set_api_params(module, ('function_name', ))
     qualifier = get_qualifier(module)
     if qualifier:
         api_params.update(Qualifier=qualifier)
@@ -337,7 +335,20 @@ def get_policy_statement(module, aws):
         # now that we have the policy, check if required permission statement is present
         for statement in policy['Statement']:
             if statement['Sid'] == sid:
-                policy_statement = statement
+                policy_statement['action'] = statement['Action']
+                policy_statement['principal'] = statement['Principal']['Service']
+                try:
+                    policy_statement['source_arn'] = statement['Condition']['ArnLike']['AWS:SourceArn']
+                except KeyError:
+                    pass
+                try:
+                    policy_statement['source_account'] = statement['Condition']['StringEquals']['AWS:SourceAccount']
+                except KeyError:
+                    pass
+                try:
+                    policy_statement['event_source_token'] = statement['Condition']['StringEquals']['lambda:EventSourceToken']
+                except KeyError:
+                    pass
                 break
 
     return policy_statement
@@ -356,12 +367,8 @@ def add_policy_permission(module, aws):
     changed = False
 
     # set API parameters
-    api_params = dict(FunctionName=module.params['function_name'])
-
-    for param in ('statement_id', 'action', 'principal', 'source_arn', 'source_account', 'event_source_token'):
-        if module.params.get(param):
-            api_params[pc(param)] = module.params[param]
-
+    params = ('function_name', 'statement_id', 'action', 'principal', 'source_arn', 'source_account', 'event_source_token')
+    api_params = set_api_params(module, params)
     qualifier = get_qualifier(module)
     if qualifier:
         api_params.update(Qualifier=qualifier)
@@ -389,9 +396,7 @@ def remove_policy_permission(module, aws):
     changed = False
 
     # set API parameters
-    api_params = dict(FunctionName=module.params['function_name'])
-    api_params.update(StatementId=module.params['statement_id'])
-
+    api_params = set_api_params(module, ('function_name', 'statement_id'))
     qualifier = get_qualifier(module)
     if qualifier:
         api_params.update(Qualifier=qualifier)
@@ -406,42 +411,33 @@ def remove_policy_permission(module, aws):
     return changed
 
 
-# ---------------------------------------------------------------------------------------------------
-#
-#   Lambda policy permissions
-#
-# ---------------------------------------------------------------------------------------------------
-
 def manage_state(module, aws):
 
-    client = aws.client('lambda')
-    facts = dict()
     changed = False
     current_state = 'absent'
     state = module.params['state']
 
-    api_params = dict(FunctionName=module.params['function_name'])
-
-    # check if required sub-parameters are present and valid
-
     # check if the policy exists
-    policy_statement = get_policy_statement(module, aws)
-    if policy_statement:
+    current_policy_statement = get_policy_statement(module, aws)
+    if current_policy_statement:
         current_state = 'present'
 
     if state == 'present':
-        if current_state == 'absent':
-            pass
-
+        if current_state == 'present':
+            # check if policy has changed and update if necessary
+            # since there's no API to update a policy statement, it must first be removed
+            if not policy_equal(module, current_policy_statement):
+                remove_policy_permission(module, aws)
+                changed = add_policy_permission(module, aws)
         else:
-            # current_state is 'present'
-            pass
+            # add policy statement
+            changed = add_policy_permission(module, aws)
     else:
         if current_state == 'present':
-            # remove the stream event mapping
-            pass
+            # remove the policy statement
+            changed = remove_policy_permission(module, aws)
 
-    return dict(changed=changed, ansible_facts=dict(lambda_policy=policy_statement))
+    return dict(changed=changed, ansible_facts=dict(lambda_policy=current_policy_statement))
 
 
 # ---------------------------------------------------------------------------------------------------
@@ -465,7 +461,7 @@ def main():
         alias=dict(required=False, default=None),
         version=dict(type='int', required=False, default=0),
         action=dict(required=True, default=None),
-        principle=dict(required=True, default=None),
+        principal=dict(required=True, default=None),
         source_arn=dict(required=False, default=None),
         source_account=dict(required=False, default=None),
         event_source_token=dict(required=False, default=None),
@@ -475,7 +471,9 @@ def main():
     module = AnsibleModule(
         argument_spec=argument_spec,
         supports_check_mode=True,
-        mutually_exclusive=[['alias', 'version']],
+        mutually_exclusive=[['alias', 'version'],
+                            ['event_source_token', 'source_arn'],
+                            ['event_source_token', 'source_account']],
         required_together=[]
     )
 
