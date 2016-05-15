@@ -18,9 +18,14 @@ import sys
 import json
 from hashlib import md5
 
+#TODO: used temporarily for backward compatibility with older versions of ansible but should be removed once included in the distro.
+try:
+    import boto2
+except ImportError:
+    pass
+
 try:
     import boto3
-    import boto              # seems to be needed for ansible.module_utils
     from botocore.exceptions import ClientError, ParamValidationError, MissingParametersError
     HAS_BOTO3 = True
 except ImportError:
@@ -37,7 +42,9 @@ description:
       AWS Lambda invokes the function.
       It is idempotent and supports "Check" mode.  Use module M(lambda) to manage the lambda
       function itself and M(lambda_alias) to manage function aliases.
-version_added: "2.1"
+
+version_added: "2.2"
+
 author: Pierre Jodouin (@pjodouin)
 options:
   lambda_function_arn:
@@ -47,7 +54,7 @@ options:
     aliases: ['function_name', 'function_arn']
   state:
     description:
-      - Describes the desired state and defaults to "present".
+      - Describes the desired state.
     required: true
     default: "present"
     choices: ["present", "absent"]
@@ -63,7 +70,7 @@ options:
     description:
       -  Source of the event that triggers the lambda function.
     required: true
-    choices: ['s3', 'Kinesis', 'DynamoDB', 'SNS']
+    choices: ['Kinesis', 'DynamoDB']
   source_params:
     description:
       -  Sub-parameters required for event source.
@@ -221,7 +228,7 @@ def validate_params(module, aws):
     # validate function name
     if not re.search('^[\w\-:]+$', function_name):
         module.fail_json(
-                msg='Function name {0} is invalid. Names must contain only alphanumeric characters and hyphens.'.format(function_name)
+            msg='Function name {0} is invalid. Names must contain only alphanumeric characters and hyphens.'.format(function_name)
         )
     if len(function_name) > 64:
         module.fail_json(msg='Function name "{0}" exceeds 64 character limit'.format(function_name))
@@ -397,13 +404,14 @@ def main():
     source_choices = [function.split('_')[-1] for function in dir(this_module) if function.startswith('lambda_event')]
 
     argument_spec = ec2_argument_spec()
-    argument_spec.update(dict(
-        state=dict(required=False, default='present', choices=['present', 'absent']),
-        lambda_function_arn=dict(required=True, default=None, aliases=['function_name', 'function_arn']),
-        event_source=dict(required=True, default=None, choices=source_choices),
-        source_params=dict(type='dict', required=True, default=None),
-        alias=dict(required=False, default=None),
-        version=dict(type='int', required=False, default=0),
+    argument_spec.update(
+        dict(
+            state=dict(required=False, default='present', choices=['present', 'absent']),
+            lambda_function_arn=dict(required=True, default=None, aliases=['function_name', 'function_arn']),
+            event_source=dict(required=True, default=None, choices=source_choices),
+            source_params=dict(type='dict', required=True, default=None),
+            alias=dict(required=False, default=None),
+            version=dict(type='int', required=False, default=0),
         )
     )
 
@@ -416,7 +424,7 @@ def main():
 
     # validate dependencies
     if not HAS_BOTO3:
-        module.fail_json(msg='Both boto3 & boto are required for this module.')
+        module.fail_json(msg='boto3 is required for this module.')
 
     aws = AWSConnection(module, ['lambda'])
 

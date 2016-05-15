@@ -14,9 +14,14 @@
 # You should have received a copy of the GNU General Public License
 # along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
 
+#TODO: used temporarily for backward compatibility with older versions of ansible but should be removed once included in the distro.
+try:
+    import boto2
+except ImportError:
+    pass
+
 try:
     import boto3
-    import boto              # seems to be needed for ansible.module_utils
     from botocore.exceptions import ClientError, ParamValidationError, MissingParametersError
     HAS_BOTO3 = True
 except ImportError:
@@ -31,7 +36,9 @@ description:
     - This module allows the management of AWS Lambda functions aliases via the Ansible
       framework.  It is idempotent and supports "Check" mode.    Use module M(lambda) to manage the lambda function
       itself and M(lambda_event) to manage event source mappings.
-version_added: "2.1"
+
+version_added: "2.2"
+
 author: Pierre Jodouin (@pjodouin)
 options:
   function_name:
@@ -40,7 +47,7 @@ options:
     required: true
   state:
     description:
-      - Describes the desired state and defaults to "present".
+      - Describes the desired state.
     required: true
     default: "present"
     choices: ["present", "absent"]
@@ -217,7 +224,7 @@ def validate_params(module, aws):
     # validate function name
     if not re.search('^[\w\-:]+$', function_name):
         module.fail_json(
-                msg='Function name {0} is invalid. Names must contain only alphanumeric characters and hyphens.'.format(function_name)
+            msg='Function name {0} is invalid. Names must contain only alphanumeric characters and hyphens.'.format(function_name)
         )
     if len(function_name) > 64:
         module.fail_json(msg='Function name "{0}" exceeds 64 character limit'.format(function_name))
@@ -329,12 +336,13 @@ def main():
     :return dict: ansible facts
     """
     argument_spec = ec2_argument_spec()
-    argument_spec.update(dict(
-        state=dict(required=False, default='present', choices=['present', 'absent']),
-        function_name=dict(required=True, default=None),
-        name=dict(required=True, default=None, aliases=['alias_name']),
-        function_version=dict(type='int', required=False, default=0, aliases=['version']),
-        description=dict(required=False, default=None),
+    argument_spec.update(
+        dict(
+            state=dict(required=False, default='present', choices=['present', 'absent']),
+            function_name=dict(required=True, default=None),
+            name=dict(required=True, default=None, aliases=['alias_name']),
+            function_version=dict(type='int', required=False, default=0, aliases=['version']),
+            description=dict(required=False, default=None),
         )
     )
 
@@ -347,7 +355,7 @@ def main():
 
     # validate dependencies
     if not HAS_BOTO3:
-        module.fail_json(msg='Both boto3 & boto are required for this module.')
+        module.fail_json(msg='boto3 is required for this module.')
 
     aws = AWSConnection(module, ['lambda'])
 

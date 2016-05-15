@@ -17,9 +17,14 @@
 import datetime
 import sys
 
+#TODO: used temporarily for backward compatibility with older versions of ansible but should be removed once included in the distro.
+try:
+    import boto2
+except ImportError:
+    pass
+
 try:
     import boto3
-    import boto                                         # seems to be needed for ansible.module_utils
     from botocore.exceptions import ClientError
     HAS_BOTO3 = True
 except ImportError:
@@ -34,7 +39,9 @@ description:
   - Gathers various details related to Lambda functions, including aliases, versions and event source mappings.
     Use module M(lambda) to manage the lambda function itself, M(lambda_alias) to manage function aliases and
     M(lambda_event) to manage lambda event source mappings.
-version_added: "2.1"
+
+version_added: "2.2"
+
 options:
   query:
     description:
@@ -343,7 +350,8 @@ def main():
     :return dict: ansible facts
     """
     argument_spec = ec2_argument_spec()
-    argument_spec.update(dict(
+    argument_spec.update(
+        dict(
             function_name=dict(required=False, default=None, aliases=['function', 'name']),
             query=dict(required=False, choices=['aliases', 'all', 'config', 'mappings', 'policy',  'versions'], default='all'),
             event_source_arn=dict(required=False, default=None)
@@ -359,14 +367,14 @@ def main():
 
     # validate dependencies
     if not HAS_BOTO3:
-        module.fail_json(msg='Both boto and boto3 are required for this module.')
+        module.fail_json(msg='boto3 is required for this module.')
 
     # validate function_name if present
     function_name = module.params['function_name']
     if function_name:
         if not re.search("^[\w\-:]+$", function_name):
             module.fail_json(
-                    msg='Function name {0} is invalid. Names must contain only alphanumeric characters and hyphens.'.format(function_name)
+                msg='Function name {0} is invalid. Names must contain only alphanumeric characters and hyphens.'.format(function_name)
             )
         if len(function_name) > 64:
             module.fail_json(msg='Function name "{0}" exceeds 64 character limit'.format(function_name))

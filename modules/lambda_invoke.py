@@ -14,13 +14,19 @@
 # You should have received a copy of the GNU General Public License
 # along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
 
+#TODO: used temporarily for backward compatibility with older versions of ansible but should be removed once included in the distro.
+try:
+    import boto2
+except ImportError:
+    pass
+
 try:
     import boto3
-    import boto                                         # seems to be needed for ansible.module_utils
     from botocore.exceptions import ClientError, EndpointConnectionError
     HAS_BOTO3 = True
 except ImportError:
     HAS_BOTO3 = False
+
 
 DOCUMENTATION = '''
 ---
@@ -30,7 +36,9 @@ description:
     - This module has a single purpose of triggering the execution of a specified lambda function.
       Use module M(lambda) to manage the lambda function itself, M(lambda_alias) to manage function aliases and
       M(lambda_event) to manage event source mappings.
-version_added: "2.1"
+
+version_added: "2.2"
+
 author: Pierre Jodouin (@pjodouin)
 options:
   function_name:
@@ -209,7 +217,8 @@ def main():
     :return dict: ansible facts
     """
     argument_spec = ec2_argument_spec()
-    argument_spec.update(dict(
+    argument_spec.update(
+        dict(
             function_name=dict(required=True, default=None),
             invocation_type=dict(required=False, choices=['Event', 'RequestResponse', 'DryRun'], default='RequestResponse'),
             qualifier=dict(default=None, required=False),
@@ -235,7 +244,7 @@ def main():
     if function_name:
         if not re.search('^[\w\-:]+$', function_name):
             module.fail_json(
-                    msg='Function name {0} is invalid. Names must contain only alphanumeric characters and hyphens.'.format(function_name)
+                msg='Function name {0} is invalid. Names must contain only alphanumeric characters and hyphens.'.format(function_name)
             )
         if len(function_name) > 64:
             module.fail_json(msg='Function name "{0}" exceeds 64 character limit'.format(function_name))

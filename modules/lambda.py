@@ -19,9 +19,14 @@ import base64
 import os
 import sys
 
+#TODO: used temporarily for backward compatibility with older versions of ansible but should be removed once included in the distro.
+try:
+    import boto2
+except ImportError:
+    pass
+
 try:
     import boto3
-    import boto              # seems to be needed for ansible.module_utils
     from botocore.exceptions import ClientError, ParamValidationError, MissingParametersError
     from boto3.s3.transfer import S3Transfer
     HAS_BOTO3 = True
@@ -38,7 +43,9 @@ description:
       framework.  It is idempotent and supports "Check" mode. Use M(lambda_alias) to manage lambda function aliases,
       M(lambda_event) to manage event source mappings such as Kinesis streams, M(lambda_invoke)
       to execute a lambda function and M(lambda_facts) to gather facts relating to one or more lambda functions.
-version_added: "2.1"
+
+version_added: "2.2"
+
 author: Pierre Jodouin (@pjodouin)
 options:
   name:
@@ -53,7 +60,7 @@ options:
     aliases: [ "function_name" ]
   state:
     description:
-      - Describes the desired state and defaults to "present".
+      - Describes the desired state.
     required: true
     default: "present"
     choices: ["present", "absent"]
@@ -272,7 +279,7 @@ def validate_params(module, aws):
     # validate function name
     if not re.search('^[\w\-:]+$', function_name):
         module.fail_json(
-                msg='Function name {0} is invalid. Names must contain only alphanumeric characters and hyphens.'.format(function_name)
+            msg='Function name {0} is invalid. Names must contain only alphanumeric characters and hyphens.'.format(function_name)
         )
     if len(function_name) > 64:
         module.fail_json(msg='Function name "{0}" exceeds 64 character limit'.format(function_name))
@@ -496,23 +503,24 @@ def main():
     :return dict: ansible facts
     """
     argument_spec = ec2_argument_spec()
-    argument_spec.update(dict(
-        state=dict(required=False, default='present', choices=['present', 'absent']),
-        function_name=dict(required=True, default=None, aliases=['name']),
-        runtime=dict(required=True, default=None),
-        role=dict(required=True, default=None),
-        handler=dict(required=True, default=None),
-        s3_bucket=dict(required=True, default=None, aliases=['code_s3_bucket']),
-        s3_key=dict(required=True, default=None, aliases=['code_s3_key']),
-        s3_object_version=dict(required=False, default=None, aliases=['code_s3_object_version']),
-        local_path=dict(required=True, default=None),
-        subnet_ids=dict(type='list', required=False, default=[], aliases=['vpc_subnet_ids']),
-        security_group_ids=dict(type='list', required=False, default=[], aliases=['vpc_security_group_ids']),
-        timeout=dict(type='int', required=False, default=3),
-        memory_size=dict(type='int', required=False, default=128),
-        description=dict(required=False, default=None),
-        publish=dict(type='bool', required=False, default=False),
-        version=dict(type='int', required=False, default=0),
+    argument_spec.update(
+        dict(
+            state=dict(required=False, default='present', choices=['present', 'absent']),
+            function_name=dict(required=True, default=None, aliases=['name']),
+            runtime=dict(required=True, default=None),
+            role=dict(required=True, default=None),
+            handler=dict(required=True, default=None),
+            s3_bucket=dict(required=True, default=None, aliases=['code_s3_bucket']),
+            s3_key=dict(required=True, default=None, aliases=['code_s3_key']),
+            s3_object_version=dict(required=False, default=None, aliases=['code_s3_object_version']),
+            local_path=dict(required=True, default=None),
+            subnet_ids=dict(type='list', required=False, default=[], aliases=['vpc_subnet_ids']),
+            security_group_ids=dict(type='list', required=False, default=[], aliases=['vpc_security_group_ids']),
+            timeout=dict(type='int', required=False, default=3),
+            memory_size=dict(type='int', required=False, default=128),
+            description=dict(required=False, default=None),
+            publish=dict(type='bool', required=False, default=False),
+            version=dict(type='int', required=False, default=0),
         )
     )
 
@@ -525,7 +533,7 @@ def main():
 
     # validate dependencies
     if not HAS_BOTO3:
-        module.fail_json(msg='Both boto3 & boto are required for this module.')
+        module.fail_json(msg='boto3 is required for this module.')
 
     aws = AWSConnection(module, ['lambda', 's3'])
 
