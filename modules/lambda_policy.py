@@ -65,7 +65,7 @@ options:
   alias:
     description:
       - Name of the function alias. Mutually exclusive with C(version).
-    required: true
+    required: false
 
   version:
     description:
