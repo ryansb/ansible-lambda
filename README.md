@@ -6,8 +6,8 @@ These modules help manage AWS Lambda resources including code, configuration, al
  up values via a Lambda function.
 
 
-*Note:*  A [pull request](https://github.com/ansible/ansible-modules-extras/pull/1890) for these modules has now been
- submitted for inclusion in _ansible-module-extras_ and is awaiting community review.
+*Note:*  I've cancelled the PR for these modules to be included in 
+ _ansible-module-extras_ as it was much too time consuming.  I will continue to maintain them here.
 
 ## Requirements
 - python >= 2.6
