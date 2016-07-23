@@ -8,6 +8,8 @@ install:
 script:
 - python -m compileall modules/*.py
 - python -m compileall plugins/lookup/*.py
+- pep8 -r --ignore=E501,E221,W291,W391,E302,E251,E203,W293,E231,E303,E201,E225,E261,E241,E402 modules
+- pep8 -r --ignore=E501,E221,W291,W391,E302,E251,E203,W293,E231,E303,E201,E225,E261,E241,E402 plugins/lookup
 - nosetests
 notifications:
   slack: virtualcomputing:sE3KduFaTBjq0jGEwPdxs0Qr

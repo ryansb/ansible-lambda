@@ -18,9 +18,9 @@ import sys
 import json
 from hashlib import md5
 
-#TODO: used temporarily for backward compatibility with older versions of ansible but should be removed once included in the distro.
+# TODO: used temporarily for backward compatibility with older versions of ansible but should be removed once included in the distro.
 try:
-    import boto2
+    import boto
 except ImportError:
     pass
 

@@ -14,9 +14,9 @@
 # You should have received a copy of the GNU General Public License
 # along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
 
-#TODO: used temporarily for backward compatibility with older versions of ansible but should be removed once included in the distro.
+# TODO: used temporarily for backward compatibility with older versions of ansible but should be removed once included in the distro.
 try:
-    import boto2
+    import boto
 except ImportError:
     pass
 
