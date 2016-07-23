@@ -99,16 +99,16 @@ options:
     required: true
   timeout:
     description:
-      - The function execution time at which Lambda should terminate the function. Because the execution time has cost 
-        implications, we recommend you set this value based on your expected execution time. The default is 3 seconds.
+      - The function execution time (in seconds) at which Lambda should terminate the function. Because the execution
+        time has cost implications, we recommend you set this value based on your expected execution time.
     required: false
     default: 3
   memory_size:
     description:
       - The amount of memory, in MB, your Lambda function is given. Lambda uses this memory size to infer the amount of 
         CPU and memory allocated to your function. Your function use-case determines your CPU and memory requirements. 
-        For example, a database operation might need less memory compared to an image processing function. The default 
-        value is 128 MB. The value must be a multiple of 64 MB.
+        For example, a database operation might need less memory compared to an image processing function.
+        The value must be a multiple of 64 and between 128 and 1536.
     required: false
     default: 128
   publish:
@@ -120,11 +120,11 @@ options:
   description:
     description:
       - A short, user-defined function description. Lambda does not use this value. Assign a meaningful description 
-        as you see fit.
+        as you see fit. There is no documented limit.
     required: false
   version:
     description:
-      -  Version number of the Lambda function to be deleted. This parameter cannot be used with state=present.
+      -  Version number of the Lambda function to be deleted. This parameter cannot be used with I(state=present).
          A value of 0 is ignored.
     required: false
   vpc_subnet_ids:
@@ -193,6 +193,9 @@ lambda_results:
     type: dict
     sample: lambda_results.Version can be useful when publishing a new version
 '''
+
+MIN_MEMORY_SIZE = 2 * 64
+MAX_MEMORY_SIZE = 24 * 64
 
 
 class AWSConnection:
@@ -293,6 +296,13 @@ def validate_params(module, aws):
     # parameter 'version' can only be used with state=absent
     if module.params['state'] == 'present' and module.params['version'] > 0:
         module.fail_json(msg="Cannot specify a version with state='present'.")
+
+    # validate memory_size
+    memory_size = module.params['memory_size']
+    if memory_size not in range(MIN_MEMORY_SIZE, MAX_MEMORY_SIZE + 1, 64):
+        module.fail_json(
+            msg='Parameter "memory_size" must be between {0} and {1} and be a multiple of 64.'.format(MIN_MEMORY_SIZE, MAX_MEMORY_SIZE)
+        )
 
     # check if 'role' needs to be expanded in full ARN format
     if not module.params['role'].startswith('arn:aws:iam:'):
