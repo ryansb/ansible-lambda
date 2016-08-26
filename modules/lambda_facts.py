@@ -402,7 +402,7 @@ def main():
     )
 
     this_module_function = getattr(this_module, invocations[module.params['query']])
-    all_facts = fix_return(this_module_function(client, module))
+    all_facts = camel_dict_to_snake_dict(fix_return(this_module_function(client, module)))
 
     results = dict(ansible_facts=dict(lambda_facts=all_facts), changed=False)
 

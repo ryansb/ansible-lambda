@@ -326,7 +326,7 @@ def lambda_alias(module, aws):
             except (ClientError, ParamValidationError, MissingParametersError) as e:
                 module.fail_json(msg='Error deleting function alias: {0}'.format(e))
 
-    return dict(changed=changed, ansible_facts=dict(lambda_alias_results=results or facts))
+    return dict(changed=changed, **dict(results or facts))
 
 
 def main():
@@ -363,7 +363,7 @@ def main():
 
     results = lambda_alias(module, aws)
 
-    module.exit_json(**results)
+    module.exit_json(**camel_dict_to_snake_dict(results))
 
 
 # ansible import module(s) kept at ~eof as recommended
