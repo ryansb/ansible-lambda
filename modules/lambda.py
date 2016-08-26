@@ -44,10 +44,10 @@ options:
   name:
     description:
       - The name you want to assign to the function. You can specify an unqualified function
-        name (for example, "Thumbnail") or you can specify Amazon Resource Name (ARN) of the function 
+        name (for example, "Thumbnail") or you can specify Amazon Resource Name (ARN) of the function
         (for example, 'arn:aws:lambda:us-west-2:account-id:function:ThumbNail'). AWS Lambda also allows you to
         specify only the account ID qualifier (for example, 'account-id:Thumbnail'). Note that the length
-        constraint applies only to the ARN. If you specify only the function name, it is limited to 64 character 
+        constraint applies only to the ARN. If you specify only the function name, it is limited to 64 character
         in length.
     required: true
     aliases: [ "function_name" ]
@@ -87,7 +87,7 @@ options:
     required: true
   role:
     description:
-      - The Amazon Resource Name (ARN) of the IAM role that Lambda assumes when it executes your function to access 
+      - The Amazon Resource Name (ARN) of the IAM role that Lambda assumes when it executes your function to access
         any other AWS resources.  If the role belongs to the same account, the simple role name can be used.
     required: true
   timeout:
@@ -98,8 +98,8 @@ options:
     default: 3
   memory_size:
     description:
-      - The amount of memory, in MB, your Lambda function is given. Lambda uses this memory size to infer the amount of 
-        CPU and memory allocated to your function. Your function use-case determines your CPU and memory requirements. 
+      - The amount of memory, in MB, your Lambda function is given. Lambda uses this memory size to infer the amount of
+        CPU and memory allocated to your function. Your function use-case determines your CPU and memory requirements.
         For example, a database operation might need less memory compared to an image processing function.
         The value must be a multiple of 64 and between 128 and 1536.
     required: false
@@ -112,7 +112,7 @@ options:
     default: false
   description:
     description:
-      - A short, user-defined function description. Lambda does not use this value. Assign a meaningful description 
+      - A short, user-defined function description. Lambda does not use this value. Assign a meaningful description
         as you see fit. There is no documented limit.
     required: false
   version:
@@ -180,11 +180,61 @@ EXAMPLES = '''
 
 RETURN = '''
 ---
-lambda_results:
-    description: dictionary of items returned by the API describing the function configuration
+code_sha256:
+    description: SHA256 hash of the code currently uploaded as $LATEST to Lambda
     returned: success
-    type: dict
-    sample: lambda_results.Version can be useful when publishing a new version
+    type: string
+    sample: IfQ6LngBe98CGyGgLRI0Q8M403AV7lWEdzm0jsiXluM=
+code_size:
+    description: size in bytes of the code package uploaded to Lambda
+    returned: success
+    type: integer
+    sample: 8428
+description:
+    description: Description (provided by you) applied to the Lambda function
+    returned: success
+    type: string
+    sample: This is a test description of a Lambda function
+function_arn:
+    description: Full ARN referring to the function. Will not include a version qualifier or alias
+    returned: success
+    type: string
+    sample: arn:aws:lambda:us-west-2:123456789012:function:myFunction
+function_name:
+    description: Name selected for the function
+    returned: success
+    type: string
+    sample: myFunction
+handler:
+    description: dotted notation for the handler function. For a file called "lambda.py" with a function called "handler" it would be "lambda.handler"
+    returned: success
+    type: string
+    sample: lambda.handler
+last_modified:
+    description: Timestamp of the last modification of the function
+    returned: success
+    type: string
+    sample: 2016-08-25T20:22:46.472+0000
+memory_size:
+    description: Memory allocated to the function (in megabytes)
+    returned: success
+    type: integer
+    sample: 128
+timeout:
+    description: Timeout in seconds before the function is terminated by Lambda
+    returned: success
+    type: integer
+    sample: 128
+role:
+    description: Full ARN of the role the Lambda function will execute as
+    returned: success
+    type: string
+    sample: arn:aws:iam::123456789012:role/SomeLambdaRole
+runtime:
+    description: Language runtime for the function
+    returned: success
+    type: string
+    sample: python2.7
 '''
 
 MIN_MEMORY_SIZE = 2 * 64
