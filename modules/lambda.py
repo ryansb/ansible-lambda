@@ -17,13 +17,6 @@
 import hashlib
 import base64
 import os
-import sys
-
-# TODO: used temporarily for backward compatibility with older versions of ansible but should be removed once included in the distro.
-try:
-    import boto
-except ImportError:
-    pass
 
 try:
     import boto3
